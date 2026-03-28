@@ -21,11 +21,49 @@
       font-size: 16px;
       color: #888;
     }
+    #hud .hp { color: #ff4444; font-weight: bold; }
+    #messages {
+      margin-top: 4px;
+      font-size: 14px;
+      color: #ccaa44;
+      text-align: left;
+      width: 100%;
+      max-width: 800px;
+      padding: 0 20px;
+      line-height: 1.4;
+    }
+    #game-over {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 10;
+    }
+    #game-over.visible { display: flex; }
+    #game-over h1 { color: #ff4444; font-size: 48px; margin-bottom: 20px; }
+    #game-over button {
+      font-family: monospace;
+      font-size: 20px;
+      padding: 10px 30px;
+      background: #333;
+      color: #fff;
+      border: 2px solid #888;
+      cursor: pointer;
+    }
+    #game-over button:hover { background: #555; }
   </style>
 </head>
 <body>
   <canvas id="game"></canvas>
   <div id="hud"></div>
+  <div id="messages"></div>
+  <div id="game-over">
+    <h1>Game Over</h1>
+    <button id="restart-btn">Restart</button>
+  </div>
   <script type="module">
     import { createGame, dispatch, getVisibleTiles, FLOOR, WALL } from './src/game.js';
 
@@ -33,10 +71,12 @@
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const hud = document.getElementById('hud');
+    const messagesEl = document.getElementById('messages');
+    const gameOverEl = document.getElementById('game-over');
+    const restartBtn = document.getElementById('restart-btn');
 
     let game = createGame();
 
-    // Colors
     const COLORS = {
       bg:     '#000000',
       wall:   '#aaaaaa',
@@ -54,9 +94,8 @@
     };
 
     function getViewSize() {
-      // Fill most of the window
       const cols = Math.floor((window.innerWidth - 40) / TILE_SIZE);
-      const rows = Math.floor((window.innerHeight - 100) / TILE_SIZE);
+      const rows = Math.floor((window.innerHeight - 160) / TILE_SIZE);
       return { cols: Math.max(10, cols), rows: Math.max(6, rows) };
     }
 
@@ -85,6 +124,9 @@
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
             ctx.fillStyle = '#000';
             ctx.fillText('@', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+          } else if (cell.monster) {
+            ctx.fillStyle = cell.monster.color;
+            ctx.fillText(cell.monster.char, px + TILE_SIZE / 2, py + TILE_SIZE / 2);
           } else if (cell.tile === WALL) {
             ctx.fillStyle = '#333';
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
@@ -97,16 +139,37 @@
         }
       }
 
-      hud.textContent = `Position: (${game.player.x}, ${game.player.y})`;
+      hud.innerHTML = `<span class="hp">HP: ${game.player.hp}/${game.player.maxHp}</span>`;
+      messagesEl.textContent = game.messages.join('\n');
+
+      if (game.gameOver) {
+        gameOverEl.classList.add('visible');
+      } else {
+        gameOverEl.classList.remove('visible');
+      }
     }
 
     document.addEventListener('keydown', (e) => {
+      if (game.gameOver) return;
+
       const dir = KEY_MAP[e.key];
       if (dir) {
         e.preventDefault();
         game = dispatch(game, { type: 'move', dir });
         render();
+        return;
       }
+
+      if (e.key === '.' || e.key === '5') {
+        e.preventDefault();
+        game = dispatch(game, { type: 'wait' });
+        render();
+      }
+    });
+
+    restartBtn.addEventListener('click', () => {
+      game = dispatch(game, { type: 'restart' });
+      render();
     });
 
     window.addEventListener('resize', render);

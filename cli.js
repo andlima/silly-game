@@ -12,9 +12,16 @@ const FG_GREEN = `${ESC}32m`;
 const FG_YELLOW = `${ESC}93m`;
 const BG_YELLOW = `${ESC}43m`;
 const FG_BLACK = `${ESC}30m`;
+const FG_RED = `${ESC}91m`;
+const FG_BROWN = `${ESC}33m`;
 const CLEAR = `${ESC}2J${ESC}H`;
 const HIDE_CURSOR = `${ESC}?25l`;
 const SHOW_CURSOR = `${ESC}?25h`;
+
+const MONSTER_COLORS = {
+  rat: FG_BROWN,
+  goblin: FG_GREEN,
+};
 
 const KEY_MAP = {
   '\x1b[A': 'n',  // up arrow
@@ -29,11 +36,17 @@ const KEY_MAP = {
 
 function getViewSize() {
   const cols = (process.stdout.columns || 80) - 2;
-  const rows = (process.stdout.rows || 24) - 3; // leave room for HUD
+  const msgLines = Math.min(game.messages.length, 5);
+  const rows = (process.stdout.rows || 24) - 4 - msgLines; // HUD + messages
   return { cols: Math.max(10, cols), rows: Math.max(6, rows) };
 }
 
 function render() {
+  if (game.gameOver) {
+    renderGameOver();
+    return;
+  }
+
   const { cols, rows } = getViewSize();
   const visible = getVisibleTiles(game, cols, rows);
 
@@ -45,6 +58,9 @@ function render() {
       const cell = visible[vy][vx];
       if (cell.isPlayer) {
         line += `${BG_YELLOW}${FG_BLACK}@${RESET}${BG_BLACK}`;
+      } else if (cell.monster) {
+        const color = MONSTER_COLORS[cell.monster.type] || FG_WHITE;
+        line += `${color}${cell.monster.char}`;
       } else if (cell.tile === WALL) {
         line += `${FG_WHITE}#`;
       } else if (cell.tile === FLOOR) {
@@ -56,8 +72,22 @@ function render() {
     out += line + RESET + '\n';
   }
 
-  out += `${FG_GREY}Position: (${game.player.x}, ${game.player.y})  |  q to quit${RESET}\n`;
+  out += `${FG_RED}HP: ${game.player.hp}/${game.player.maxHp}${RESET}  |  ${FG_GREY}q to quit${RESET}\n`;
 
+  for (const msg of game.messages) {
+    out += `${FG_YELLOW}${msg}${RESET}\n`;
+  }
+
+  process.stdout.write(out);
+}
+
+function renderGameOver() {
+  let out = CLEAR + BG_BLACK;
+  out += `\n\n${FG_RED}  *** GAME OVER ***${RESET}\n\n`;
+  for (const msg of game.messages) {
+    out += `  ${FG_YELLOW}${msg}${RESET}\n`;
+  }
+  out += `\n${FG_GREY}  Press r to restart or q to quit${RESET}\n`;
   process.stdout.write(out);
 }
 
@@ -73,14 +103,28 @@ process.stdin.setEncoding('utf8');
 process.stdout.write(HIDE_CURSOR);
 
 process.stdin.on('data', (key) => {
-  if (key === 'q' || key === 'Q' || key === '\x03') { // q or Ctrl-C
+  if (key === 'q' || key === 'Q' || key === '\x03') {
     cleanup();
+    return;
+  }
+
+  if (game.gameOver) {
+    if (key === 'r' || key === 'R') {
+      game = dispatch(game, { type: 'restart' });
+      render();
+    }
     return;
   }
 
   const dir = KEY_MAP[key];
   if (dir) {
     game = dispatch(game, { type: 'move', dir });
+    render();
+    return;
+  }
+
+  if (key === '.' || key === '5') {
+    game = dispatch(game, { type: 'wait' });
     render();
   }
 });
