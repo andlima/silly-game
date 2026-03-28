@@ -1,4 +1,4 @@
-base_ref = "main"
+base_ref = "origin/main"
 
 [paths]
 specs_dir = "specs"
