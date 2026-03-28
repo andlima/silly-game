@@ -11,11 +11,7 @@ const DIRECTIONS = {
 
 export function createGame() {
   const map = createMap();
-  // Spawn player in the center of the room
-  const player = {
-    x: Math.floor(map.width / 2),
-    y: Math.floor(map.height / 2),
-  };
+  const player = { x: map.spawn.x, y: map.spawn.y };
   return { map, player };
 }
 
