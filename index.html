@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Silly Roguelike</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      color: #aaa;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 20px;
+    }
+    canvas { display: block; image-rendering: pixelated; }
+    #hud {
+      margin-top: 8px;
+      font-size: 16px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="hud"></div>
+  <script type="module">
+    import { createGame, dispatch, getVisibleTiles, FLOOR, WALL } from './src/game.js';
+
+    const TILE_SIZE = 18;
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const hud = document.getElementById('hud');
+
+    let game = createGame();
+
+    // Colors
+    const COLORS = {
+      bg:     '#000000',
+      wall:   '#aaaaaa',
+      floor:  '#225522',
+      player: '#ffdd00',
+      floorChar: '#33aa33',
+    };
+
+    const KEY_MAP = {
+      ArrowUp:    'n', ArrowDown:  's', ArrowLeft:  'w', ArrowRight: 'e',
+      w: 'n', W: 'n',
+      s: 's', S: 's',
+      a: 'w', A: 'w',
+      d: 'e', D: 'e',
+    };
+
+    function getViewSize() {
+      // Fill most of the window
+      const cols = Math.floor((window.innerWidth - 40) / TILE_SIZE);
+      const rows = Math.floor((window.innerHeight - 100) / TILE_SIZE);
+      return { cols: Math.max(10, cols), rows: Math.max(6, rows) };
+    }
+
+    function render() {
+      const { cols, rows } = getViewSize();
+      canvas.width = cols * TILE_SIZE;
+      canvas.height = rows * TILE_SIZE;
+
+      const visible = getVisibleTiles(game, cols, rows);
+
+      ctx.fillStyle = COLORS.bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.font = `${TILE_SIZE - 2}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      for (let vy = 0; vy < visible.length; vy++) {
+        for (let vx = 0; vx < visible[vy].length; vx++) {
+          const cell = visible[vy][vx];
+          const px = vx * TILE_SIZE;
+          const py = vy * TILE_SIZE;
+
+          if (cell.isPlayer) {
+            ctx.fillStyle = COLORS.player;
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            ctx.fillStyle = '#000';
+            ctx.fillText('@', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+          } else if (cell.tile === WALL) {
+            ctx.fillStyle = '#333';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            ctx.fillStyle = COLORS.wall;
+            ctx.fillText('#', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+          } else if (cell.tile === FLOOR) {
+            ctx.fillStyle = COLORS.floorChar;
+            ctx.fillText('.', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+          }
+        }
+      }
+
+      hud.textContent = `Position: (${game.player.x}, ${game.player.y})`;
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const dir = KEY_MAP[e.key];
+      if (dir) {
+        e.preventDefault();
+        game = dispatch(game, { type: 'move', dir });
+        render();
+      }
+    });
+
+    window.addEventListener('resize', render);
+    render();
+  </script>
+</body>
+</html>
