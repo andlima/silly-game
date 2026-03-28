@@ -1,6 +1,6 @@
-import { createMap, isWalkable } from './map.js';
+import { createMap, isWalkable, getTile } from './map.js';
 
-export { FLOOR, WALL } from './map.js';
+export { FLOOR, WALL, STAIR } from './map.js';
 
 const DIRECTIONS = {
   n:  { dx:  0, dy: -1 },
@@ -10,30 +10,89 @@ const DIRECTIONS = {
 };
 
 const MONSTER_TYPES = {
-  rat: { name: 'Rat', char: 'r', color: '#cc6633', hp: 5, attack: 2, defense: 0 },
+  rat:    { name: 'Rat',    char: 'r', color: '#cc6633', hp: 5,  attack: 2, defense: 0 },
   goblin: { name: 'Goblin', char: 'g', color: '#33cc33', hp: 10, attack: 4, defense: 1 },
+  orc:    { name: 'Orc',    char: 'o', color: '#ff6600', hp: 20, attack: 6, defense: 3 },
+  troll:  { name: 'Troll',  char: 'T', color: '#cc00cc', hp: 30, attack: 8, defense: 4 },
 };
 
 const PLAYER_STATS = { hp: 30, maxHp: 30, attack: 5, defense: 2 };
 
 const MAX_MESSAGES = 5;
+const WIN_LEVEL = 5;
+const POTION_HEAL = 10;
 
 export function createGame() {
-  const map = createMap();
-  const player = { x: map.spawn.x, y: map.spawn.y, ...PLAYER_STATS };
-  const monsters = spawnMonsters(map);
-  return { map, player, monsters, messages: [], gameOver: false };
+  return newLevel({
+    player: { ...PLAYER_STATS },
+    inventory: { potions: 0 },
+    level: 1,
+    messages: [],
+    gameOver: false,
+    won: false,
+  });
 }
 
-function spawnMonsters(map) {
+function newLevel(state) {
+  const map = createMap();
+  const player = { ...state.player, x: map.spawn.x, y: map.spawn.y };
+  const monsters = spawnMonsters(map, state.level);
+  const items = spawnPotions(map, monsters);
+  placeStair(map);
+  return {
+    map,
+    player,
+    monsters,
+    items,
+    inventory: { ...state.inventory },
+    level: state.level,
+    messages: state.messages,
+    gameOver: false,
+    won: false,
+  };
+}
+
+function placeStair(map) {
+  // Place stair in last room (different from spawn room 0)
+  const room = map.rooms[map.rooms.length - 1];
+  const cx = Math.floor(room.x + room.w / 2);
+  const cy = Math.floor(room.y + room.h / 2);
+  map.tiles[cy][cx] = '>';
+}
+
+function spawnPotions(map, monsters) {
+  const items = [];
+  // 1-2 potions per level, placed in random rooms (not room 0)
+  const count = 1 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < count; i++) {
+    const roomIdx = 1 + Math.floor(Math.random() * (map.rooms.length - 1));
+    const room = map.rooms[roomIdx];
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const x = room.x + Math.floor(Math.random() * room.w);
+      const y = room.y + Math.floor(Math.random() * room.h);
+      if (
+        isWalkable(map, x, y) &&
+        !monsters.some(m => m.x === x && m.y === y) &&
+        !items.some(it => it.x === x && it.y === y) &&
+        map.tiles[y][x] !== '>'
+      ) {
+        items.push({ x, y, type: 'potion', char: '!', color: '#ff44ff' });
+        break;
+      }
+    }
+  }
+  return items;
+}
+
+function spawnMonsters(map, level) {
   const monsters = [];
+  const baseCount = 1 + Math.floor(level / 2);
   for (let i = 1; i < map.rooms.length; i++) {
     const room = map.rooms[i];
-    const count = 1 + Math.floor(Math.random() * 3); // 1-3
+    const count = baseCount + Math.floor(Math.random() * 2); // baseCount to baseCount+1
     for (let j = 0; j < count; j++) {
-      const type = Math.random() < 0.5 ? 'rat' : 'goblin';
+      const type = pickMonsterType(level);
       const template = MONSTER_TYPES[type];
-      // Find a free floor tile in the room
       for (let attempt = 0; attempt < 20; attempt++) {
         const x = room.x + Math.floor(Math.random() * room.w);
         const y = room.y + Math.floor(Math.random() * room.h);
@@ -51,14 +110,25 @@ function spawnMonsters(map) {
   return monsters;
 }
 
+function pickMonsterType(level) {
+  const roll = Math.random();
+  if (level >= 4 && roll < 0.15) return 'troll';
+  if (level >= 3 && roll < 0.35) return 'orc';
+  return Math.random() < 0.5 ? 'rat' : 'goblin';
+}
+
 export function dispatch(game, action) {
-  if (game.gameOver && action.type !== 'restart') return game;
+  if ((game.gameOver || game.won) && action.type !== 'restart') return game;
 
   switch (action.type) {
     case 'move':
       return handleMove(game, action.dir);
     case 'wait':
       return runMonsterTurns(game);
+    case 'descend':
+      return handleDescend(game);
+    case 'usePotion':
+      return handleUsePotion(game);
     case 'restart':
       return createGame();
     default:
@@ -81,11 +151,80 @@ function handleMove(game, dir) {
 
   if (!isWalkable(game.map, nx, ny)) return runMonsterTurns(game);
 
-  const moved = {
+  let moved = {
     ...game,
     player: { ...game.player, x: nx, y: ny },
   };
+
+  // Auto-pickup items at new position
+  moved = checkPickup(moved);
+
   return runMonsterTurns(moved);
+}
+
+function checkPickup(game) {
+  const { player, items } = game;
+  const itemHere = items.find(it => it.x === player.x && it.y === player.y);
+  if (!itemHere) return game;
+
+  if (itemHere.type === 'potion') {
+    const messages = [...game.messages, 'You pick up a health potion.'];
+    return {
+      ...game,
+      items: items.filter(it => it !== itemHere),
+      inventory: { ...game.inventory, potions: game.inventory.potions + 1 },
+      messages: messages.slice(-MAX_MESSAGES),
+    };
+  }
+  return game;
+}
+
+function handleDescend(game) {
+  const tile = getTile(game.map, game.player.x, game.player.y);
+  if (tile !== '>') {
+    const messages = [...game.messages, 'There are no stairs here.'];
+    return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+  }
+
+  if (game.level >= WIN_LEVEL) {
+    const messages = [...game.messages, 'You descend the final staircase and escape the dungeon!'];
+    return {
+      ...game,
+      messages: messages.slice(-MAX_MESSAGES),
+      won: true,
+    };
+  }
+
+  const messages = [...game.messages, `You descend to level ${game.level + 1}.`];
+  return newLevel({
+    player: { ...game.player },
+    inventory: { ...game.inventory },
+    level: game.level + 1,
+    messages: messages.slice(-MAX_MESSAGES),
+    gameOver: false,
+    won: false,
+  });
+}
+
+function handleUsePotion(game) {
+  if (game.inventory.potions <= 0) {
+    const messages = [...game.messages, 'You have no potions.'];
+    return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+  }
+  if (game.player.hp >= game.player.maxHp) {
+    const messages = [...game.messages, 'You are already at full health.'];
+    return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+  }
+
+  const newHp = Math.min(game.player.maxHp, game.player.hp + POTION_HEAL);
+  const healed = newHp - game.player.hp;
+  const messages = [...game.messages, `You drink a potion and restore ${healed} HP.`];
+  return {
+    ...game,
+    player: { ...game.player, hp: newHp },
+    inventory: { ...game.inventory, potions: game.inventory.potions - 1 },
+    messages: messages.slice(-MAX_MESSAGES),
+  };
 }
 
 function playerAttack(game, target) {
@@ -172,10 +311,10 @@ function tryMonsterMove(map, monsters, player, monsterIdx, dx, dy) {
 
 /**
  * Return a 2D slice of the map centered on the player, sized viewW × viewH.
- * Each cell is { tile, isPlayer, monster }.
+ * Each cell is { tile, isPlayer, monster, item }.
  */
 export function getVisibleTiles(game, viewW, viewH) {
-  const { map, player, monsters } = game;
+  const { map, player, monsters, items } = game;
 
   let camX = player.x - Math.floor(viewW / 2);
   let camY = player.y - Math.floor(viewH / 2);
@@ -188,6 +327,14 @@ export function getVisibleTiles(game, viewW, viewH) {
     monsterAt[`${m.x},${m.y}`] = m;
   }
 
+  // Build item lookup
+  const itemAt = {};
+  if (items) {
+    for (const it of items) {
+      itemAt[`${it.x},${it.y}`] = it;
+    }
+  }
+
   const result = [];
   for (let vy = 0; vy < viewH; vy++) {
     const row = [];
@@ -197,10 +344,12 @@ export function getVisibleTiles(game, viewW, viewH) {
       const inBounds = mx >= 0 && mx < map.width && my >= 0 && my < map.height;
       const tile = inBounds ? map.tiles[my][mx] : ' ';
       const monster = monsterAt[`${mx},${my}`] || null;
+      const item = itemAt[`${mx},${my}`] || null;
       row.push({
         tile,
         isPlayer: mx === player.x && my === player.y,
         monster,
+        item,
       });
     }
     result.push(row);

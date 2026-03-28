@@ -1,4 +1,4 @@
-import { createGame, dispatch, getVisibleTiles, FLOOR, WALL } from './src/game.js';
+import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR } from './src/game.js';
 
 let game = createGame();
 
@@ -14,6 +14,8 @@ const BG_YELLOW = `${ESC}43m`;
 const FG_BLACK = `${ESC}30m`;
 const FG_RED = `${ESC}91m`;
 const FG_BROWN = `${ESC}33m`;
+const FG_CYAN = `${ESC}96m`;
+const FG_MAGENTA = `${ESC}95m`;
 const CLEAR = `${ESC}2J${ESC}H`;
 const HIDE_CURSOR = `${ESC}?25l`;
 const SHOW_CURSOR = `${ESC}?25h`;
@@ -21,6 +23,8 @@ const SHOW_CURSOR = `${ESC}?25h`;
 const MONSTER_COLORS = {
   rat: FG_BROWN,
   goblin: FG_GREEN,
+  orc: `${ESC}38;5;208m`,  // orange
+  troll: FG_MAGENTA,
 };
 
 const KEY_MAP = {
@@ -46,6 +50,10 @@ function render() {
     renderGameOver();
     return;
   }
+  if (game.won) {
+    renderWin();
+    return;
+  }
 
   const { cols, rows } = getViewSize();
   const visible = getVisibleTiles(game, cols, rows);
@@ -61,8 +69,12 @@ function render() {
       } else if (cell.monster) {
         const color = MONSTER_COLORS[cell.monster.type] || FG_WHITE;
         line += `${color}${cell.monster.char}`;
+      } else if (cell.item) {
+        line += `${FG_MAGENTA}${cell.item.char}`;
       } else if (cell.tile === WALL) {
         line += `${FG_WHITE}#`;
+      } else if (cell.tile === STAIR) {
+        line += `${FG_CYAN}>`;
       } else if (cell.tile === FLOOR) {
         line += `${FG_GREEN}.`;
       } else {
@@ -72,7 +84,10 @@ function render() {
     out += line + RESET + '\n';
   }
 
-  out += `${FG_RED}HP: ${game.player.hp}/${game.player.maxHp}${RESET}  |  ${FG_GREY}q to quit${RESET}\n`;
+  out += `${FG_RED}HP: ${game.player.hp}/${game.player.maxHp}${RESET}`;
+  out += `  ${FG_CYAN}Level: ${game.level}${RESET}`;
+  out += `  ${FG_MAGENTA}Potions: ${game.inventory.potions}${RESET}`;
+  out += `  |  ${FG_GREY}p:potion  >/.:descend  q:quit${RESET}\n`;
 
   for (const msg of game.messages) {
     out += `${FG_YELLOW}${msg}${RESET}\n`;
@@ -84,6 +99,17 @@ function render() {
 function renderGameOver() {
   let out = CLEAR + BG_BLACK;
   out += `\n\n${FG_RED}  *** GAME OVER ***${RESET}\n\n`;
+  for (const msg of game.messages) {
+    out += `  ${FG_YELLOW}${msg}${RESET}\n`;
+  }
+  out += `\n${FG_GREY}  Press r to restart or q to quit${RESET}\n`;
+  process.stdout.write(out);
+}
+
+function renderWin() {
+  let out = CLEAR + BG_BLACK;
+  out += `\n\n${FG_GREEN}  *** YOU WIN! ***${RESET}\n\n`;
+  out += `  ${FG_YELLOW}You escaped the dungeon on level ${game.level}!${RESET}\n`;
   for (const msg of game.messages) {
     out += `  ${FG_YELLOW}${msg}${RESET}\n`;
   }
@@ -108,7 +134,7 @@ process.stdin.on('data', (key) => {
     return;
   }
 
-  if (game.gameOver) {
+  if (game.gameOver || game.won) {
     if (key === 'r' || key === 'R') {
       game = dispatch(game, { type: 'restart' });
       render();
@@ -123,7 +149,19 @@ process.stdin.on('data', (key) => {
     return;
   }
 
-  if (key === '.' || key === '5') {
+  if (key === '.' || key === '>') {
+    game = dispatch(game, { type: 'descend' });
+    render();
+    return;
+  }
+
+  if (key === 'p' || key === 'P') {
+    game = dispatch(game, { type: 'usePotion' });
+    render();
+    return;
+  }
+
+  if (key === '5') {
     game = dispatch(game, { type: 'wait' });
     render();
   }

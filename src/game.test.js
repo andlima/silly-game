@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { FLOOR, WALL } from './map.js';
+import { FLOOR, WALL, STAIR } from './map.js';
 
 // Helper to create a minimal map for testing (no randomness needed)
 function makeMap(width, height, floorPositions, rooms) {
@@ -36,8 +36,12 @@ function makeGame(overrides = {}) {
     map,
     player: { x: 2, y: 2, hp: 30, maxHp: 30, attack: 5, defense: 2, ...overrides.player },
     monsters: overrides.monsters || [],
+    items: overrides.items || [],
+    inventory: { potions: 0, ...overrides.inventory },
+    level: overrides.level || 1,
     messages: overrides.messages || [],
     gameOver: overrides.gameOver || false,
+    won: overrides.won || false,
   };
 }
 
@@ -99,11 +103,9 @@ describe('runMonsterTurns', () => {
   });
 
   it('monster idles when beyond range 6', () => {
-    // Monster at x=8, y=5, player at x=2, y=2 => Chebyshev dist = max(6,3) = 6
-    // Exactly 6 is within range, so push further
+    // Monster at x=8, y=1, player at x=1, y=5 => Chebyshev = max(7,4) = 7 > 6
     const monster = makeMonster({ x: 8, y: 1 });
     const game = makeGame({ player: { x: 1, y: 5 }, monsters: [monster] });
-    // Chebyshev = max(7,4) = 7 > 6
     const next = dispatch(game, { type: 'wait' });
     assert.equal(next.monsters[0].x, 8);
     assert.equal(next.monsters[0].y, 1);
@@ -148,6 +150,12 @@ describe('dispatch', () => {
     const game = makeGame({ gameOver: true });
     const next = dispatch(game, { type: 'move', dir: 'n' });
     assert.strictEqual(next, game); // unchanged reference
+  });
+
+  it('blocks actions except restart when won', () => {
+    const game = makeGame({ won: true });
+    const next = dispatch(game, { type: 'move', dir: 'n' });
+    assert.strictEqual(next, game);
   });
 
   it('restart resets the game state', () => {
@@ -200,5 +208,151 @@ describe('message log', () => {
     const g = { ...game, monsters: [monster] };
     const next = dispatch(g, { type: 'move', dir: 'e' });
     assert.ok(next.messages.length <= 5);
+  });
+});
+
+describe('items and potions', () => {
+  it('auto-picks up potion when walking over it', () => {
+    const potion = { x: 3, y: 2, type: 'potion', char: '!', color: '#ff44ff' };
+    const game = makeGame({ items: [potion] });
+    const next = dispatch(game, { type: 'move', dir: 'e' }); // walk east to 3,2
+    assert.equal(next.items.length, 0);
+    assert.equal(next.inventory.potions, 1);
+    assert.ok(next.messages.some(m => m.includes('pick up')));
+  });
+
+  it('usePotion restores HP capped at max', () => {
+    const game = makeGame({ player: { hp: 15 }, inventory: { potions: 2 } });
+    const next = dispatch(game, { type: 'usePotion' });
+    assert.equal(next.player.hp, 25); // 15 + 10
+    assert.equal(next.inventory.potions, 1);
+    assert.ok(next.messages.some(m => m.includes('restore')));
+  });
+
+  it('usePotion caps at maxHp', () => {
+    const game = makeGame({ player: { hp: 28 }, inventory: { potions: 1 } });
+    const next = dispatch(game, { type: 'usePotion' });
+    assert.equal(next.player.hp, 30);
+    assert.equal(next.inventory.potions, 0);
+  });
+
+  it('usePotion fails with no potions', () => {
+    const game = makeGame({ inventory: { potions: 0 } });
+    const next = dispatch(game, { type: 'usePotion' });
+    assert.equal(next.inventory.potions, 0);
+    assert.ok(next.messages.some(m => m.includes('no potions')));
+  });
+
+  it('usePotion fails at full health', () => {
+    const game = makeGame({ player: { hp: 30 }, inventory: { potions: 1 } });
+    const next = dispatch(game, { type: 'usePotion' });
+    assert.equal(next.inventory.potions, 1); // not consumed
+    assert.ok(next.messages.some(m => m.includes('full health')));
+  });
+});
+
+describe('stairs and levels', () => {
+  it('descend on non-stair tile shows message', () => {
+    const game = makeGame();
+    const next = dispatch(game, { type: 'descend' });
+    assert.ok(next.messages.some(m => m.includes('no stairs')));
+  });
+
+  it('descend on stair tile advances to next level', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR; // put stair at player position
+    const game = makeGame({ map, level: 1 });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.level, 2);
+    assert.ok(next.messages.some(m => m.includes('level 2')));
+  });
+
+  it('descend at level 5 triggers win', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({ map, level: 5 });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.won, true);
+    assert.ok(next.messages.some(m => m.includes('escape')));
+  });
+
+  it('inventory persists across levels', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({ map, level: 1, inventory: { potions: 3 } });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.inventory.potions, 3);
+  });
+
+  it('HP persists across levels (no regen)', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({ map, level: 1, player: { hp: 15 } });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.player.hp, 15);
+  });
+});
+
+describe('createGame structure', () => {
+  it('creates game with all required fields', () => {
+    const game = createGame();
+    assert.ok(game.map);
+    assert.ok(game.player);
+    assert.ok(Array.isArray(game.monsters));
+    assert.ok(Array.isArray(game.items));
+    assert.ok(game.inventory);
+    assert.equal(typeof game.level, 'number');
+    assert.equal(game.level, 1);
+    assert.equal(game.won, false);
+    assert.equal(game.gameOver, false);
+  });
+
+  it('places a stair tile on the map', () => {
+    const game = createGame();
+    let hasStair = false;
+    for (let y = 0; y < game.map.height; y++) {
+      for (let x = 0; x < game.map.width; x++) {
+        if (game.map.tiles[y][x] === '>') hasStair = true;
+      }
+    }
+    assert.ok(hasStair, 'Map should contain a stair tile');
+  });
+
+  it('spawns 1-2 potions on the map', () => {
+    const game = createGame();
+    assert.ok(game.items.length >= 1 && game.items.length <= 2,
+      `Expected 1-2 potions, got ${game.items.length}`);
+    for (const item of game.items) {
+      assert.equal(item.type, 'potion');
+      assert.equal(item.char, '!');
+    }
   });
 });

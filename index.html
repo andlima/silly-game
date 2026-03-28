@@ -22,6 +22,8 @@
       color: #888;
     }
     #hud .hp { color: #ff4444; font-weight: bold; }
+    #hud .level { color: #44aaff; font-weight: bold; }
+    #hud .potions { color: #ff44ff; font-weight: bold; }
     #messages {
       margin-top: 4px;
       font-size: 14px;
@@ -32,7 +34,7 @@
       padding: 0 20px;
       line-height: 1.4;
     }
-    #game-over {
+    #overlay {
       display: none;
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -42,9 +44,11 @@
       flex-direction: column;
       z-index: 10;
     }
-    #game-over.visible { display: flex; }
-    #game-over h1 { color: #ff4444; font-size: 48px; margin-bottom: 20px; }
-    #game-over button {
+    #overlay.visible { display: flex; }
+    #overlay h1 { font-size: 48px; margin-bottom: 20px; }
+    #overlay h1.game-over { color: #ff4444; }
+    #overlay h1.win { color: #44ff44; }
+    #overlay button {
       font-family: monospace;
       font-size: 20px;
       padding: 10px 30px;
@@ -53,26 +57,27 @@
       border: 2px solid #888;
       cursor: pointer;
     }
-    #game-over button:hover { background: #555; }
+    #overlay button:hover { background: #555; }
   </style>
 </head>
 <body>
   <canvas id="game"></canvas>
   <div id="hud"></div>
   <div id="messages"></div>
-  <div id="game-over">
-    <h1>Game Over</h1>
+  <div id="overlay">
+    <h1 id="overlay-title">Game Over</h1>
     <button id="restart-btn">Restart</button>
   </div>
   <script type="module">
-    import { createGame, dispatch, getVisibleTiles, FLOOR, WALL } from './src/game.js';
+    import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR } from './src/game.js';
 
     const TILE_SIZE = 18;
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const hud = document.getElementById('hud');
     const messagesEl = document.getElementById('messages');
-    const gameOverEl = document.getElementById('game-over');
+    const overlayEl = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
     const restartBtn = document.getElementById('restart-btn');
 
     let game = createGame();
@@ -83,6 +88,8 @@
       floor:  '#225522',
       player: '#ffdd00',
       floorChar: '#33aa33',
+      stair:  '#44aaff',
+      potion: '#ff44ff',
     };
 
     const KEY_MAP = {
@@ -127,11 +134,17 @@
           } else if (cell.monster) {
             ctx.fillStyle = cell.monster.color;
             ctx.fillText(cell.monster.char, px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+          } else if (cell.item) {
+            ctx.fillStyle = cell.item.color;
+            ctx.fillText(cell.item.char, px + TILE_SIZE / 2, py + TILE_SIZE / 2);
           } else if (cell.tile === WALL) {
             ctx.fillStyle = '#333';
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
             ctx.fillStyle = COLORS.wall;
             ctx.fillText('#', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+          } else if (cell.tile === STAIR) {
+            ctx.fillStyle = COLORS.stair;
+            ctx.fillText('>', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
           } else if (cell.tile === FLOOR) {
             ctx.fillStyle = COLORS.floorChar;
             ctx.fillText('.', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
@@ -139,18 +152,26 @@
         }
       }
 
-      hud.innerHTML = `<span class="hp">HP: ${game.player.hp}/${game.player.maxHp}</span>`;
+      hud.innerHTML = `<span class="hp">HP: ${game.player.hp}/${game.player.maxHp}</span>` +
+        `  <span class="level">Level: ${game.level}</span>` +
+        `  <span class="potions">Potions: ${game.inventory.potions}</span>`;
       messagesEl.textContent = game.messages.join('\n');
 
       if (game.gameOver) {
-        gameOverEl.classList.add('visible');
+        overlayTitle.textContent = 'Game Over';
+        overlayTitle.className = 'game-over';
+        overlayEl.classList.add('visible');
+      } else if (game.won) {
+        overlayTitle.textContent = 'You Win!';
+        overlayTitle.className = 'win';
+        overlayEl.classList.add('visible');
       } else {
-        gameOverEl.classList.remove('visible');
+        overlayEl.classList.remove('visible');
       }
     }
 
     document.addEventListener('keydown', (e) => {
-      if (game.gameOver) return;
+      if (game.gameOver || game.won) return;
 
       const dir = KEY_MAP[e.key];
       if (dir) {
@@ -160,7 +181,21 @@
         return;
       }
 
-      if (e.key === '.' || e.key === '5') {
+      if (e.key === '.' || e.key === '>') {
+        e.preventDefault();
+        game = dispatch(game, { type: 'descend' });
+        render();
+        return;
+      }
+
+      if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        game = dispatch(game, { type: 'usePotion' });
+        render();
+        return;
+      }
+
+      if (e.key === '5') {
         e.preventDefault();
         game = dispatch(game, { type: 'wait' });
         render();
