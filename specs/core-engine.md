@@ -1,6 +1,6 @@
 ---
 id: core-engine
-status: not-started
+status: done
 area: full-stack
 priority: 10
 depends_on: []
