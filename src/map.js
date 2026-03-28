@@ -9,8 +9,8 @@ export const WALL = '#';
  * Returns { width, height, tiles, spawn } where spawn is { x, y }.
  */
 export function createMap() {
-  const { width, height, tiles, spawn } = generateDungeon();
-  return { width, height, tiles, spawn };
+  const { width, height, tiles, rooms, spawn } = generateDungeon();
+  return { width, height, tiles, rooms, spawn };
 }
 
 export function getTile(map, x, y) {
