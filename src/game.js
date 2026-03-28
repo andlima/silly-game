@@ -27,8 +27,6 @@ export function createGame() {
 
 function spawnMonsters(map) {
   const monsters = [];
-  const startRoom = map.rooms[0];
-
   for (let i = 1; i < map.rooms.length; i++) {
     const room = map.rooms[i];
     const count = 1 + Math.floor(Math.random() * 3); // 1-3
@@ -81,7 +79,7 @@ function handleMove(game, dir) {
     return playerAttack(game, targetMonster);
   }
 
-  if (!isWalkable(game.map, nx, ny)) return game;
+  if (!isWalkable(game.map, nx, ny)) return runMonsterTurns(game);
 
   const moved = {
     ...game,
