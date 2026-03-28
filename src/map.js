@@ -1,29 +1,16 @@
+import { generateDungeon } from './dungeon.js';
+
 // Tile types
 export const FLOOR = '.';
 export const WALL = '#';
 
 /**
- * Create a hardcoded starter room — rectangular with walls on all sides.
- * Returns a 2D array [y][x] of tile characters.
+ * Create a procedurally generated dungeon.
+ * Returns { width, height, tiles, spawn } where spawn is { x, y }.
  */
 export function createMap() {
-  const width = 40;
-  const height = 20;
-  const tiles = [];
-
-  for (let y = 0; y < height; y++) {
-    const row = [];
-    for (let x = 0; x < width; x++) {
-      if (y === 0 || y === height - 1 || x === 0 || x === width - 1) {
-        row.push(WALL);
-      } else {
-        row.push(FLOOR);
-      }
-    }
-    tiles.push(row);
-  }
-
-  return { width, height, tiles };
+  const { width, height, tiles, spawn } = generateDungeon();
+  return { width, height, tiles, spawn };
 }
 
 export function getTile(map, x, y) {
