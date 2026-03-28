@@ -3,6 +3,7 @@ import { generateDungeon } from './dungeon.js';
 // Tile types
 export const FLOOR = '.';
 export const WALL = '#';
+export const STAIR = '>';
 
 /**
  * Create a procedurally generated dungeon.
@@ -19,5 +20,6 @@ export function getTile(map, x, y) {
 }
 
 export function isWalkable(map, x, y) {
-  return getTile(map, x, y) === FLOOR;
+  const tile = getTile(map, x, y);
+  return tile === FLOOR || tile === STAIR;
 }
