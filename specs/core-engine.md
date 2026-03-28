@@ -62,10 +62,27 @@ map with walls blocking movement, in either interface.
 
 - Browser tile size: roughly 16-20px so the grid feels retro
 - Suggested color scheme: black background, white/grey walls, green floor, yellow player
-- Keep rendering and game logic strictly separated — renderers import from `src/` but
-  never contain game logic themselves
-- The shared game module should expose an interface like:
-  `createGame()`, `movePlayer(game, direction)`, `getVisibleTiles(game, viewportW, viewportH)`
+
+### Interface boundary (action-based architecture)
+
+The shared game module exposes a pure, action-based API. Frontends never call
+domain functions (like `movePlayer`) directly — they translate platform input
+into action objects and dispatch them.
+
+```
+createGame()                      → game state object
+dispatch(game, { type, ... })     → updated game state
+getVisibleTiles(game, w, h)       → 2D slice for rendering
+```
+
+Each frontend is responsible for exactly two things:
+1. **Input adapter** — translate platform events (DOM keydown / Node stdin) into
+   action objects (e.g., `{ type: 'move', dir: 'n' }`)
+2. **Renderer** — read game state and draw it (canvas / ANSI); never mutate state
+
+This keeps all game rules in `src/` and makes frontends thin, interchangeable shells.
+As future specs add actions (attack, use-item, descend), only `dispatch` grows —
+frontends just map new keys to new action types.
 
 ## Agent Notes
 
