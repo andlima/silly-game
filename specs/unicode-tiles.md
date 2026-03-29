@@ -76,11 +76,18 @@ emoji.
     renders emoji poorly, a fallback font stack can be specified (e.g.,
     `"Segoe UI Emoji", "Noto Color Emoji", monospace`).
 
-### Rendering mode toggle (stretch goal)
+### Runtime rendering mode toggle
 
-11. A toggle between "classic" (ASCII) and "enhanced" (Unicode/emoji) mode,
-   stored in a simple config or query param for web / command-line flag for
-   CLI. If not implemented, default to enhanced mode.
+11. Pressing `Tab` (or another unbound key) toggles between "classic" (ASCII,
+    1-column cells) and "enhanced" (Unicode/emoji, 2-column cells) at runtime.
+    The toggle re-renders immediately with no restart required.
+
+12. The TUI recalculates viewport tile count on toggle (1-col vs 2-col).
+    The web canvas re-renders with the alternate glyph set at the same tile
+    size.
+
+13. Default mode is "enhanced" (emoji). The current mode is shown in the HUD
+    (e.g., `[ASCII]` or `[emoji]`).
 
 ## Out of Scope
 
