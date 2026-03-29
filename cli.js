@@ -60,10 +60,33 @@ function render() {
 
   let out = CLEAR + BG_BLACK;
 
+  const FG_DARK_GREY = `${ESC}90m`;
+
   for (let vy = 0; vy < visible.length; vy++) {
     let line = '';
     for (let vx = 0; vx < visible[vy].length; vx++) {
       const cell = visible[vy][vx];
+
+      if (cell.visibility === 'hidden') {
+        line += ' ';
+        continue;
+      }
+
+      if (cell.visibility === 'revealed') {
+        // Dark grey for all remembered tiles
+        if (cell.tile === WALL) {
+          line += `${FG_DARK_GREY}#`;
+        } else if (cell.tile === STAIR) {
+          line += `${FG_DARK_GREY}>`;
+        } else if (cell.tile === FLOOR) {
+          line += `${FG_DARK_GREY}.`;
+        } else {
+          line += ' ';
+        }
+        continue;
+      }
+
+      // Visible tiles — normal colors
       if (cell.isPlayer) {
         line += `${BG_YELLOW}${FG_BLACK}@${RESET}${BG_BLACK}`;
       } else if (cell.monster) {
