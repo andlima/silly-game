@@ -3,7 +3,7 @@
 
 // Enhanced (emoji/unicode) glyph set — default
 export const GLYPHS_ENHANCED = {
-  player:   { char: '@', wide: false },
+  player:   { char: '🧙', wide: true },
   wall:     { char: '\u2588\u2588', wide: true },   // ██ two full blocks, seamless
   floor:    { char: ' ', wide: false },              // blank space
   stair:    { char: '\u25bc', wide: false },         // ▼ downward triangle
