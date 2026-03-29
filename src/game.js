@@ -46,7 +46,9 @@ function newLevel(state) {
   const fov = computeFOV(map, player.x, player.y, TORCH_RADIUS);
   for (const key of fov.keys()) {
     const [rx, ry] = key.split(',').map(Number);
-    revealed[ry][rx] = true;
+    if (ry >= 0 && ry < map.height && rx >= 0 && rx < map.width) {
+      revealed[ry][rx] = true;
+    }
   }
 
   return {
@@ -130,11 +132,14 @@ function pickMonsterType(level) {
 }
 
 function updateFOV(game) {
+  if (!game.revealed || !game.map) return game;
   const fov = computeFOV(game.map, game.player.x, game.player.y, TORCH_RADIUS);
   const revealed = game.revealed.map(row => [...row]);
   for (const key of fov.keys()) {
     const [rx, ry] = key.split(',').map(Number);
-    revealed[ry][rx] = true;
+    if (ry >= 0 && ry < game.map.height && rx >= 0 && rx < game.map.width) {
+      revealed[ry][rx] = true;
+    }
   }
   return { ...game, fov, revealed };
 }
@@ -389,7 +394,7 @@ export function getVisibleTiles(game, viewW, viewH) {
 
       row.push({
         tile,
-        isPlayer: mx === player.x && my === player.y,
+        isPlayer: visibility === 'visible' && mx === player.x && my === player.y,
         monster,
         item,
         visibility,

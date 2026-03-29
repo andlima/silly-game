@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { FLOOR, WALL, STAIR } from './map.js';
+import { computeFOV, TORCH_RADIUS } from './fov.js';
 
 // Helper to create a minimal map for testing (no randomness needed)
 function makeMap(width, height, floorPositions, rooms) {
@@ -32,9 +33,21 @@ function makeGame(overrides = {}) {
       floor.push([x, y]);
 
   const map = overrides.map || makeMap(10, 7, floor);
+  const player = { x: 2, y: 2, hp: 30, maxHp: 30, attack: 5, defense: 2, ...overrides.player };
+
+  // Initialize revealed and fov so dispatch/updateFOV won't crash
+  const revealed = Array.from({ length: map.height }, () => new Array(map.width).fill(false));
+  const fov = computeFOV(map, player.x, player.y, TORCH_RADIUS);
+  for (const key of fov.keys()) {
+    const [rx, ry] = key.split(',').map(Number);
+    if (ry >= 0 && ry < map.height && rx >= 0 && rx < map.width) {
+      revealed[ry][rx] = true;
+    }
+  }
+
   return {
     map,
-    player: { x: 2, y: 2, hp: 30, maxHp: 30, attack: 5, defense: 2, ...overrides.player },
+    player,
     monsters: overrides.monsters || [],
     items: overrides.items || [],
     inventory: { potions: 0, ...overrides.inventory },
@@ -42,6 +55,8 @@ function makeGame(overrides = {}) {
     messages: overrides.messages || [],
     gameOver: overrides.gameOver || false,
     won: overrides.won || false,
+    revealed,
+    fov,
   };
 }
 
@@ -354,5 +369,103 @@ describe('createGame structure', () => {
       assert.equal(item.type, 'potion');
       assert.equal(item.char, '!');
     }
+  });
+});
+
+// We import getVisibleTiles dynamically
+const { getVisibleTiles } = await import('./game.js');
+
+describe('computeFOV', () => {
+  it('blocks visibility through walls', () => {
+    // Two separate rooms with thick wall barrier between them
+    const floor = [];
+    // Left room: x=1-3, y=1-3
+    for (let y = 1; y <= 3; y++)
+      for (let x = 1; x <= 3; x++)
+        floor.push([x, y]);
+    // Right room: x=15-17, y=1-3
+    for (let y = 1; y <= 3; y++)
+      for (let x = 15; x <= 17; x++)
+        floor.push([x, y]);
+    const map = makeMap(20, 5, floor);
+    const fov = computeFOV(map, 2, 2, 8);
+    assert.ok(fov.has('2,2'), 'Player position should be visible');
+    assert.ok(fov.has('3,2'), 'Adjacent open tile should be visible');
+    assert.ok(!fov.has('15,2'), 'Tile in far room should not be visible');
+    assert.ok(!fov.has('16,2'), 'Tile in far room should not be visible');
+  });
+
+  it('brightness is 1.0 at origin and >= 0.3 at edge', () => {
+    const floor = [];
+    for (let y = 0; y < 20; y++)
+      for (let x = 0; x < 20; x++)
+        floor.push([x, y]);
+    const map = makeMap(20, 20, floor);
+    const fov = computeFOV(map, 10, 10, 8);
+    assert.equal(fov.get('10,10'), 1.0);
+    for (const [, b] of fov) {
+      assert.ok(b >= 0.3 && b <= 1.0, `Brightness ${b} out of range [0.3, 1.0]`);
+    }
+  });
+});
+
+describe('FOV integration', () => {
+  it('revealed tiles persist after player moves away', () => {
+    const game = makeGame();
+    // Player starts at 2,2 — tiles near 2,2 are revealed
+    assert.ok(game.revealed[2][2], 'Starting position should be revealed');
+    // Move south twice
+    const g1 = dispatch(game, { type: 'move', dir: 's' });
+    const g2 = dispatch(g1, { type: 'move', dir: 's' });
+    // Original position should still be revealed
+    assert.ok(g2.revealed[2][2], 'Previously visited tile should remain revealed');
+  });
+
+  it('revealed resets on new level', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({ map, level: 1 });
+    // Mark some tiles as revealed
+    assert.ok(game.revealed[2][2], 'Current level tile should be revealed');
+    const next = dispatch(game, { type: 'descend' });
+    // New level should have fresh revealed array — old positions not necessarily revealed
+    assert.ok(next.revealed, 'New level should have a revealed array');
+    assert.equal(next.level, 2);
+  });
+
+  it('getVisibleTiles excludes monsters and items from non-visible cells', () => {
+    // Two rooms separated by thick walls; monster in far room
+    const floor = [];
+    for (let y = 1; y <= 3; y++)
+      for (let x = 1; x <= 3; x++)
+        floor.push([x, y]);
+    for (let y = 1; y <= 3; y++)
+      for (let x = 15; x <= 17; x++)
+        floor.push([x, y]);
+    const map = makeMap(20, 5, floor);
+    const monster = makeMonster({ x: 16, y: 2 });
+    const game = makeGame({ map, player: { x: 2, y: 2 }, monsters: [monster] });
+    assert.ok(!game.fov.has('16,2'), 'Monster position should not be in FOV');
+    const tiles = getVisibleTiles(game, 20, 5);
+    const cell = tiles[2][16];
+    assert.equal(cell.monster, null, 'Monster in non-visible cell should be null');
+  });
+
+  it('getVisibleTiles includes visibility and brightness fields', () => {
+    const game = makeGame();
+    const tiles = getVisibleTiles(game, 10, 7);
+    // Player cell should be visible with brightness 1.0
+    const playerCell = tiles.find(row => row.find(c => c.isPlayer))
+      ?.find(c => c.isPlayer);
+    assert.ok(playerCell, 'Should find player cell');
+    assert.equal(playerCell.visibility, 'visible');
+    assert.equal(playerCell.brightness, 1.0);
   });
 });

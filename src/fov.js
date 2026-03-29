@@ -75,7 +75,7 @@ function castOctant(map, ox, oy, radius, octant, row, startSlope, endSlope, visi
           nextStartSlope = rightSlope;
         } else {
           blocked = false;
-          nextStartSlope = startSlope; // Reset to parent's start slope on unblock
+          // Keep nextStartSlope from the last blocked cell's right slope
         }
       } else if (isOpaque(map, x, y) && r < radius) {
         blocked = true;
