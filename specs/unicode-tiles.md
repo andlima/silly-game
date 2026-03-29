@@ -30,10 +30,10 @@ emoji.
    | Wall         | `#`     | `██`      | Two consecutive full blocks, no gap |
    | Floor        | `.`     | ` ` (blank) | Empty space — walls define the shape |
    | Stair down   | `>`     | `▼` or `🪜` | Prefer single-width `▼` in TUI |
-   | Rat          | `r`     | `🐀` / `R` | Emoji, double-width    |
-   | Snake        | `s`     | `🐍` / `S` | Emoji, double-width    |
-   | Bear         | `b`     | `🐻` / `B` | Emoji, double-width    |
-   | Dragon       | `d`     | `🐉` / `D` | Emoji, double-width    |
+   | Rat          | `r`     | `🐀` / `r` | Emoji, double-width    |
+   | Snake        | `s`     | `🐍` / `s` | Emoji, double-width    |
+   | Bear         | `b`     | `🐻` / `b` | Emoji, double-width    |
+   | Dragon       | `d`     | `🐉` / `d` | Emoji, double-width    |
    | Potion       | `!`     | `🧪`      | Emoji, double-width    |
 
    The exact emoji choices may be adjusted during implementation as long as
