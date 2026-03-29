@@ -399,6 +399,8 @@ export function getVisibleTiles(game, viewW, viewH) {
         item,
         visibility,
         brightness: bright,
+        x: mx,
+        y: my,
       });
     }
     result.push(row);
