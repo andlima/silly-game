@@ -27,14 +27,18 @@ const FG_HP_LOST = `${ESC}38;5;238m`;
 const PLAYER_BG = `${ESC}48;5;94m`;  // dark amber/brown background
 const PLAYER_FG = `${ESC}38;5;220m`; // golden yellow foreground
 
-// Blue-grey wall brightness levels (dark → bright, ANSI 256-color)
-const WALL_SHADES = [60, 61, 66, 67];
+// Blue-grey wall shade palettes (indexed by position hash for stone texture)
+// Bright tier (near player, high brightness)
+const WALL_SHADES_BRIGHT = [59, 60, 66, 67];
+// Dim tier (edge of torch radius, low brightness)
+const WALL_SHADES_DIM = [23, 24, 59, 60];
+// Remembered tier (explored but not currently visible)
+const WALL_SHADES_REMEMBERED = [236, 237, 238, 239];
 // Floor brightness levels (very dark grey shades)
 const FLOOR_SHADES = [233, 234, 235, 236];
 // Stair brightness levels
 const STAIR_SHADES = [23, 30, 37, 44];
 // Remembered (explored but not visible) tile colors
-const REMEMBERED_WALL = `${ESC}38;5;238m`;
 const REMEMBERED_FLOOR = `${ESC}38;5;233m`;
 const REMEMBERED_STAIR = `${ESC}38;5;237m`;
 
@@ -48,6 +52,18 @@ function brightnessToIndex(brightness) {
   if (brightness <= 0.50) return 1;
   if (brightness <= 0.75) return 2;
   return 3;
+}
+
+// Position-based wall shade: stable hash from map coordinates
+function wallShade(x, y, brightness) {
+  const hash = (x * 7 + y * 13) % 4;
+  const palette = brightness > 0.5 ? WALL_SHADES_BRIGHT : WALL_SHADES_DIM;
+  return palette[hash];
+}
+
+function wallShadeRemembered(x, y) {
+  const hash = (x * 7 + y * 13) % 4;
+  return WALL_SHADES_REMEMBERED[hash];
 }
 
 const MONSTER_COLORS = {
@@ -136,7 +152,7 @@ function render() {
 
       if (c.visibility === 'revealed') {
         if (c.tile === WALL) {
-          line += cell(REMEMBERED_WALL, GLYPHS.wall);
+          line += cell(fg256(wallShadeRemembered(c.x, c.y)), GLYPHS.wall);
         } else if (c.tile === STAIR) {
           line += cell(REMEMBERED_STAIR, GLYPHS.stair);
         } else if (c.tile === FLOOR) {
@@ -167,7 +183,7 @@ function render() {
           line += cell(FG_MAGENTA, itemGlyph);
         }
       } else if (c.tile === WALL) {
-        const shade = WALL_SHADES[brightnessToIndex(c.brightness)];
+        const shade = wallShade(c.x, c.y, c.brightness);
         line += cell(fg256(shade), GLYPHS.wall);
       } else if (c.tile === STAIR) {
         const shade = STAIR_SHADES[brightnessToIndex(c.brightness)];
