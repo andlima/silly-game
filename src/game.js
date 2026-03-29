@@ -19,6 +19,15 @@ const MONSTER_TYPES = {
 
 const PLAYER_STATS = { hp: 30, maxHp: 30, attack: 5, defense: 2 };
 
+const EQUIPMENT_TYPES = {
+  dagger: { name: 'Dagger', slot: 'weapon', stat: 'attack', bonus: 2, char: '|', color: '#aaaaaa' },
+  sword:  { name: 'Sword',  slot: 'weapon', stat: 'attack', bonus: 4, char: '/', color: '#dddddd' },
+  helmet: { name: 'Helmet', slot: 'helmet', stat: 'defense', bonus: 1, char: '^', color: '#88aacc' },
+  shield: { name: 'Shield', slot: 'shield', stat: 'defense', bonus: 2, char: ']', color: '#99bbdd' },
+};
+
+export { EQUIPMENT_TYPES };
+
 const MAX_MESSAGES = 5;
 const WIN_LEVEL = 5;
 const POTION_HEAL = 10;
@@ -27,6 +36,7 @@ export function createGame() {
   return newLevel({
     player: { ...PLAYER_STATS },
     inventory: { potions: 0 },
+    equipment: { weapon: null, helmet: null, shield: null },
     level: 1,
     messages: [],
     gameOver: false,
@@ -39,6 +49,7 @@ function newLevel(state) {
   const player = { ...state.player, x: map.spawn.x, y: map.spawn.y };
   const monsters = spawnMonsters(map, state.level);
   const items = spawnPotions(map, monsters);
+  spawnEquipment(map, monsters, items, state.level);
   placeStair(map);
 
   // Initialize revealed array (all false) and compute initial FOV
@@ -57,6 +68,7 @@ function newLevel(state) {
     monsters,
     items,
     inventory: { ...state.inventory },
+    equipment: state.equipment ? { ...state.equipment } : { weapon: null, helmet: null, shield: null },
     level: state.level,
     messages: state.messages,
     gameOver: false,
@@ -96,6 +108,41 @@ function spawnPotions(map, monsters) {
     }
   }
   return items;
+}
+
+function pickEquipmentType(level) {
+  // Levels 1-2: daggers and helmets; levels 3+: add swords and shields
+  if (level <= 2) {
+    return Math.random() < 0.5 ? 'dagger' : 'helmet';
+  }
+  const roll = Math.random();
+  if (roll < 0.25) return 'dagger';
+  if (roll < 0.50) return 'helmet';
+  if (roll < 0.75) return 'sword';
+  return 'shield';
+}
+
+function spawnEquipment(map, monsters, items, level) {
+  const count = 1 + Math.floor(Math.random() * 2); // 1-2 pieces
+  for (let i = 0; i < count; i++) {
+    const roomIdx = 1 + Math.floor(Math.random() * (map.rooms.length - 1));
+    const room = map.rooms[roomIdx];
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const x = room.x + Math.floor(Math.random() * room.w);
+      const y = room.y + Math.floor(Math.random() * room.h);
+      if (
+        isWalkable(map, x, y) &&
+        !monsters.some(m => m.x === x && m.y === y) &&
+        !items.some(it => it.x === x && it.y === y) &&
+        map.tiles[y][x] !== '>'
+      ) {
+        const type = pickEquipmentType(level);
+        const template = EQUIPMENT_TYPES[type];
+        items.push({ x, y, type, char: template.char, color: template.color });
+        break;
+      }
+    }
+  }
 }
 
 function spawnMonsters(map, level) {
@@ -209,6 +256,24 @@ function checkPickup(game) {
       messages: messages.slice(-MAX_MESSAGES),
     };
   }
+
+  const eqDef = EQUIPMENT_TYPES[itemHere.type];
+  if (eqDef) {
+    const slot = eqDef.slot;
+    const current = game.equipment[slot];
+    if (current && current.bonus >= eqDef.bonus) {
+      const messages = [...game.messages, 'You already have better equipment.'];
+      return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+    }
+    const statLabel = eqDef.stat === 'attack' ? 'attack' : 'defense';
+    const messages = [...game.messages, `You equip a ${eqDef.name} (+${eqDef.bonus} ${statLabel}).`];
+    return {
+      ...game,
+      items: items.filter(it => it !== itemHere),
+      equipment: { ...game.equipment, [slot]: { type: itemHere.type, name: eqDef.name, bonus: eqDef.bonus, stat: eqDef.stat } },
+      messages: messages.slice(-MAX_MESSAGES),
+    };
+  }
   return game;
 }
 
@@ -232,6 +297,7 @@ function handleDescend(game) {
   return newLevel({
     player: { ...game.player },
     inventory: { ...game.inventory },
+    equipment: { ...game.equipment },
     level: game.level + 1,
     messages: messages.slice(-MAX_MESSAGES),
     gameOver: false,
@@ -260,8 +326,17 @@ function handleUsePotion(game) {
   };
 }
 
+function getEquipmentBonus(equipment, stat) {
+  let bonus = 0;
+  for (const slot of Object.values(equipment)) {
+    if (slot && slot.stat === stat) bonus += slot.bonus;
+  }
+  return bonus;
+}
+
 function playerAttack(game, target) {
-  const damage = Math.max(0, game.player.attack - target.defense);
+  const atkBonus = getEquipmentBonus(game.equipment, 'attack');
+  const damage = Math.max(0, game.player.attack + atkBonus - target.defense);
   const newHp = target.hp - damage;
   const messages = [...game.messages];
   messages.push(`You hit the ${target.name} for ${damage} damage.`);
@@ -295,7 +370,8 @@ function runMonsterTurns(game) {
 
     if (dist === 1) {
       // Adjacent: attack player
-      const damage = Math.max(0, m.attack - currentPlayer.defense);
+      const defBonus = getEquipmentBonus(game.equipment, 'defense');
+      const damage = Math.max(0, m.attack - (currentPlayer.defense + defBonus));
       currentPlayer = { ...currentPlayer, hp: currentPlayer.hp - damage };
       messages.push(`The ${m.name} hits you for ${damage} damage.`);
       if (currentPlayer.hp <= 0) {
