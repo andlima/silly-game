@@ -390,15 +390,15 @@
       // Tab toggles render mode even during game over/win
       if (e.key === 'Tab') {
         e.preventDefault();
-        minimapVisible = !minimapVisible;
+        toggleRenderMode();
         render();
         return;
       }
 
-      // 'm' toggles render mode (ASCII/emoji)
+      // 'm' toggles minimap visibility
       if (e.key === 'm' || e.key === 'M') {
         e.preventDefault();
-        toggleRenderMode();
+        minimapVisible = !minimapVisible;
         render();
         return;
       }
