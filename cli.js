@@ -1,5 +1,5 @@
 import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR } from './src/game.js';
-import { GLYPHS } from './src/glyphs.js';
+import { GLYPHS, toggleRenderMode, getRenderMode } from './src/glyphs.js';
 
 let game = createGame();
 
@@ -11,7 +11,6 @@ const FG_WHITE = `${ESC}97m`;
 const FG_GREY = `${ESC}37m`;
 const FG_GREEN = `${ESC}32m`;
 const FG_YELLOW = `${ESC}93m`;
-const BG_YELLOW = `${ESC}43m`;
 const FG_BLACK = `${ESC}30m`;
 const FG_RED = `${ESC}91m`;
 const FG_BROWN = `${ESC}33m`;
@@ -22,10 +21,11 @@ const HIDE_CURSOR = `${ESC}?25l`;
 const SHOW_CURSOR = `${ESC}?25h`;
 
 // 256-color helpers
-const FG_DARK_GREY = `${ESC}90m`;
-const FG_DARK_GREEN = `${ESC}38;5;22m`;
-const FG_WALL_GREY = `${ESC}38;5;240m`;
 const FG_HP_LOST = `${ESC}38;5;238m`;
+
+// Player colors: dark amber background, golden foreground
+const PLAYER_BG = `${ESC}48;5;94m`;  // dark amber/brown background
+const PLAYER_FG = `${ESC}38;5;220m`; // golden yellow foreground
 
 // Blue-grey wall brightness levels (dark → bright, ANSI 256-color)
 const WALL_SHADES = [60, 61, 66, 67];
@@ -52,9 +52,9 @@ function brightnessToIndex(brightness) {
 
 const MONSTER_COLORS = {
   rat: FG_BROWN,
-  goblin: FG_GREEN,
-  orc: `${ESC}38;5;208m`,  // orange
-  troll: FG_MAGENTA,
+  skeleton: FG_WHITE,
+  bear: `${ESC}38;5;130m`,  // brown
+  dragon: FG_MAGENTA,
 };
 
 const KEY_MAP = {
@@ -68,23 +68,33 @@ const KEY_MAP = {
   'd': 'e', 'D': 'e',
 };
 
-// Each tile cell is 2 terminal columns wide
-const CELL_WIDTH = 2;
+function getCellWidth() {
+  return getRenderMode() === 'enhanced' ? 2 : 1;
+}
 
 function getViewSize() {
+  const cellWidth = getCellWidth();
   const termCols = (process.stdout.columns || 80) - 2;
-  const cols = Math.floor(termCols / CELL_WIDTH);
+  const cols = Math.floor(termCols / cellWidth);
   const msgLines = Math.min(game.messages.length, 5);
   const rows = (process.stdout.rows || 24) - 4 - msgLines; // HUD + messages
   return { cols: Math.max(10, cols), rows: Math.max(6, rows) };
 }
 
-// Render a glyph into a 2-column cell
+// Render a glyph into a cell (2-col for enhanced, 1-col for ASCII)
 function cell(colorCode, glyph) {
+  if (getRenderMode() === 'ascii') {
+    return `${colorCode}${glyph.char}`;
+  }
   if (glyph.wide) {
     return `${colorCode}${glyph.char}`;
   }
   return `${colorCode} ${glyph.char}`;
+}
+
+// Blank cell matching current mode width
+function blankCell() {
+  return getRenderMode() === 'enhanced' ? '  ' : ' ';
 }
 
 function hpBar(hp, maxHp) {
@@ -120,7 +130,7 @@ function render() {
       const c = visible[vy][vx];
 
       if (c.visibility === 'hidden') {
-        line += '  ';
+        line += blankCell();
         continue;
       }
 
@@ -132,14 +142,14 @@ function render() {
         } else if (c.tile === FLOOR) {
           line += cell(REMEMBERED_FLOOR, GLYPHS.floor);
         } else {
-          line += '  ';
+          line += blankCell();
         }
         continue;
       }
 
       // Visible tiles
       if (c.isPlayer) {
-        line += cell(`${BG_YELLOW}${FG_BLACK}`, GLYPHS.player) + `${RESET}${BG_BLACK}`;
+        line += cell(`${PLAYER_BG}${PLAYER_FG}`, GLYPHS.player) + `${RESET}${BG_BLACK}`;
       } else if (c.monster) {
         const monsterGlyph = GLYPHS[c.monster.type] || { char: c.monster.char, wide: false };
         if (monsterGlyph.wide) {
@@ -166,16 +176,18 @@ function render() {
         const shade = FLOOR_SHADES[brightnessToIndex(c.brightness)];
         line += cell(fg256(shade), GLYPHS.floor);
       } else {
-        line += '  ';
+        line += blankCell();
       }
     }
     out += line + RESET + '\n';
   }
 
+  const modeLabel = getRenderMode() === 'enhanced' ? '[emoji]' : '[ASCII]';
   out += hpBar(game.player.hp, game.player.maxHp);
   out += `  ${FG_CYAN}Level: ${game.level}${RESET}`;
   out += `  ${FG_MAGENTA}Potions: ${game.inventory.potions}${RESET}`;
-  out += `  |  ${FG_GREY}p:potion  >/.:descend  q:quit${RESET}\n`;
+  out += `  ${FG_GREY}${modeLabel}${RESET}`;
+  out += `  |  ${FG_GREY}p:potion  >/.:descend  Tab:toggle  q:quit${RESET}\n`;
 
   for (const msg of game.messages) {
     out += `${FG_YELLOW}${msg}${RESET}\n`;
@@ -227,6 +239,13 @@ process.stdin.on('data', (key) => {
       game = dispatch(game, { type: 'restart' });
       render();
     }
+    return;
+  }
+
+  // Tab key toggles render mode
+  if (key === '\t') {
+    toggleRenderMode();
+    render();
     return;
   }
 
