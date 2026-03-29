@@ -347,18 +347,18 @@
     }
 
     document.addEventListener('keydown', (e) => {
-      // Tab toggles minimap visibility
+      // Tab toggles render mode (ASCII/emoji)
       if (e.key === 'Tab') {
         e.preventDefault();
-        minimapVisible = !minimapVisible;
+        toggleRenderMode();
         render();
         return;
       }
 
-      // 'm' toggles render mode (ASCII/emoji)
+      // 'm' toggles minimap visibility
       if (e.key === 'm' || e.key === 'M') {
         e.preventDefault();
-        toggleRenderMode();
+        minimapVisible = !minimapVisible;
         render();
         return;
       }
