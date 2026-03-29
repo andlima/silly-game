@@ -31,7 +31,7 @@ emoji.
    | Floor        | `.`     | ` ` (blank) | Empty space — walls define the shape |
    | Stair down   | `>`     | `▼` or `🪜` | Prefer single-width `▼` in TUI |
    | Rat          | `r`     | `🐀`      | Emoji, double-width    |
-   | Snake        | `s`     | `🐍`      | Emoji, double-width    |
+   | Skeleton     | `s`     | `💀`      | Emoji, double-width    |
    | Bear         | `b`     | `🐻`      | Emoji, double-width    |
    | Dragon       | `d`     | `🐉`      | Emoji, double-width    |
    | Potion       | `!`     | `🧪`      | Emoji, double-width    |
@@ -126,7 +126,7 @@ emoji.
   mixed emoji and single-width chars on the same row.
 - The `getVisibleTiles` function in `src/game.js` returns tile/entity data —
   it does not need to change. Only the rendering layer maps entities to glyphs.
-- This spec replaces the monster roster (Rat/Goblin/Orc/Troll → Rat/Snake/
+- This spec replaces the monster roster (Rat/Goblin/Orc/Troll → Rat/Skeleton/
   Bear/Dragon). Update the monster definitions in `src/game.js` — names, ASCII
   chars, colors, and stats should scale similarly to the old set (Rat weakest,
   Dragon strongest). Keep the same spawn logic and stat progression curve.
