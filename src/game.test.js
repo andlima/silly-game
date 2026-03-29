@@ -51,6 +51,7 @@ function makeGame(overrides = {}) {
     monsters: overrides.monsters || [],
     items: overrides.items || [],
     inventory: { potions: 0, ...overrides.inventory },
+    equipment: overrides.equipment || { weapon: null, helmet: null, shield: null },
     level: overrides.level || 1,
     messages: overrides.messages || [],
     gameOver: overrides.gameOver || false,
@@ -266,6 +267,87 @@ describe('items and potions', () => {
   });
 });
 
+describe('equipment', () => {
+  it('picking up equipment into an empty slot equips it', () => {
+    const dagger = { x: 3, y: 2, type: 'dagger', char: '|', color: '#aaaaaa' };
+    const game = makeGame({ items: [dagger], equipment: { weapon: null, helmet: null, shield: null } });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.items.length, 0);
+    assert.equal(next.equipment.weapon.type, 'dagger');
+    assert.equal(next.equipment.weapon.bonus, 2);
+    assert.ok(next.messages.some(m => m.includes('equip a Dagger')));
+  });
+
+  it('picking up a strictly better item replaces equipped item', () => {
+    const sword = { x: 3, y: 2, type: 'sword', char: '/', color: '#dddddd' };
+    const game = makeGame({
+      items: [sword],
+      equipment: { weapon: { type: 'dagger', name: 'Dagger', bonus: 2, stat: 'attack' }, helmet: null, shield: null },
+    });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.items.length, 0);
+    assert.equal(next.equipment.weapon.type, 'sword');
+    assert.equal(next.equipment.weapon.bonus, 4);
+    assert.ok(next.messages.some(m => m.includes('equip a Sword')));
+  });
+
+  it('picking up an equal or worse item is skipped', () => {
+    const dagger = { x: 3, y: 2, type: 'dagger', char: '|', color: '#aaaaaa' };
+    const game = makeGame({
+      items: [dagger],
+      equipment: { weapon: { type: 'sword', name: 'Sword', bonus: 4, stat: 'attack' }, helmet: null, shield: null },
+    });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.items.length, 1); // item stays
+    assert.equal(next.equipment.weapon.type, 'sword'); // not replaced
+    assert.ok(next.messages.some(m => m.includes('already have better')));
+  });
+
+  it('combat damage correctly includes equipment attack bonus', () => {
+    const monster = makeMonster({ x: 3, y: 2, hp: 20, maxHp: 20, defense: 0 });
+    const game = makeGame({
+      monsters: [monster],
+      equipment: { weapon: { type: 'sword', name: 'Sword', bonus: 4, stat: 'attack' }, helmet: null, shield: null },
+    });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    // player.attack=5 + sword bonus=4 = 9 damage
+    assert.equal(next.monsters[0].hp, 11); // 20 - 9
+  });
+
+  it('combat damage correctly includes equipment defense bonus', () => {
+    const monster = makeMonster({ x: 3, y: 2, attack: 10, defense: 100 });
+    const game = makeGame({
+      monsters: [monster],
+      equipment: { weapon: null, helmet: { type: 'helmet', name: 'Helmet', bonus: 1, stat: 'defense' }, shield: { type: 'shield', name: 'Shield', bonus: 2, stat: 'defense' } },
+    });
+    // Attack the monster (will do 0 damage), monster attacks back
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    // Monster attack=10, player defense=2 + helmet(1) + shield(2) = 5, damage = 5
+    assert.equal(next.player.hp, 25);
+  });
+
+  it('equipment persists across level transitions', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({
+      map,
+      level: 1,
+      equipment: { weapon: { type: 'sword', name: 'Sword', bonus: 4, stat: 'attack' }, helmet: null, shield: null },
+    });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.level, 2);
+    assert.equal(next.equipment.weapon.type, 'sword');
+    assert.equal(next.equipment.weapon.bonus, 4);
+  });
+});
+
 describe('stairs and levels', () => {
   it('descend on non-stair tile shows message', () => {
     const game = makeGame();
@@ -361,12 +443,15 @@ describe('createGame structure', () => {
     assert.ok(hasStair, 'Map should contain a stair tile');
   });
 
-  it('spawns 1-2 potions on the map', () => {
+  it('spawns potions and equipment on the map', () => {
     const game = createGame();
-    assert.ok(game.items.length >= 1 && game.items.length <= 2,
-      `Expected 1-2 potions, got ${game.items.length}`);
-    for (const item of game.items) {
-      assert.equal(item.type, 'potion');
+    const potions = game.items.filter(it => it.type === 'potion');
+    const equipment = game.items.filter(it => ['dagger', 'sword', 'helmet', 'shield'].includes(it.type));
+    assert.ok(potions.length >= 1 && potions.length <= 2,
+      `Expected 1-2 potions, got ${potions.length}`);
+    assert.ok(equipment.length >= 1 && equipment.length <= 2,
+      `Expected 1-2 equipment, got ${equipment.length}`);
+    for (const item of potions) {
       assert.equal(item.char, '!');
     }
   });

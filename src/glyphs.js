@@ -12,6 +12,10 @@ export const GLYPHS_ENHANCED = {
   bear:     { char: '\ud83d\udc3b', wide: true },    // 🐻
   dragon:   { char: '\ud83d\udc09', wide: true },    // 🐉
   potion:   { char: '\ud83c\udf4e', wide: true },    // 🍎
+  dagger:   { char: '\ud83d\udde1\ufe0f', wide: true },  // 🗡️
+  sword:    { char: '\u2694\ufe0f', wide: true },         // ⚔️
+  helmet:   { char: '\ud83e\ude96', wide: true },         // 🪖
+  shield:   { char: '\ud83d\udee1\ufe0f', wide: true },   // 🛡️
 };
 
 // Classic ASCII glyph set — 1-column cells
@@ -25,6 +29,10 @@ export const GLYPHS_ASCII = {
   bear:     { char: 'b', wide: false },
   dragon:   { char: 'd', wide: false },
   potion:   { char: '!', wide: false },
+  dagger:   { char: '|', wide: false },
+  sword:    { char: '/', wide: false },
+  helmet:   { char: '^', wide: false },
+  shield:   { char: ']', wide: false },
 };
 
 // Default to enhanced mode

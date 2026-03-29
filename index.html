@@ -52,6 +52,7 @@
     }
     #hud .level { color: #44aaff; font-weight: bold; }
     #hud .potions { color: #dd55cc; font-weight: bold; }
+    #hud .equipment { color: #99bbdd; font-size: 13px; }
     #hud .mode { color: #888; font-size: 13px; }
     #messages {
       margin-top: 4px;
@@ -100,6 +101,7 @@
     </div>
     <span class="level" id="hud-level"></span>
     <span class="potions" id="hud-potions"></span>
+    <span class="equipment" id="hud-equipment"></span>
     <span class="mode" id="hud-mode"></span>
   </div>
   <div id="messages"></div>
@@ -108,7 +110,7 @@
     <button id="restart-btn">Restart</button>
   </div>
   <script type="module">
-    import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR } from './src/game.js';
+    import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR, EQUIPMENT_TYPES } from './src/game.js';
     import { GLYPHS, toggleRenderMode, getRenderMode } from './src/glyphs.js';
 
     const TILE_SIZE = 24;
@@ -136,6 +138,10 @@
       playerBg:'#44380a',
       stair:   '#5599dd',
       potion:  '#dd55cc',
+      dagger:  '#aaaaaa',
+      sword:   '#dddddd',
+      helmet:  '#88aacc',
+      shield:  '#99bbdd',
     };
 
     const KEY_MAP = {
@@ -320,6 +326,16 @@
 
       document.getElementById('hud-level').textContent = `Level: ${game.level}`;
       document.getElementById('hud-potions').textContent = `Potions: ${game.inventory.potions}`;
+
+      // Equipment HUD
+      const eq = game.equipment;
+      const eqParts = [];
+      const weaponStr = eq.weapon ? `${eq.weapon.name} +${eq.weapon.bonus}atk` : '\u2014';
+      const helmetStr = eq.helmet ? `${eq.helmet.name} +${eq.helmet.bonus}def` : '\u2014';
+      const shieldStr = eq.shield ? `${eq.shield.name} +${eq.shield.bonus}def` : '\u2014';
+      document.getElementById('hud-equipment').textContent =
+        `Weapon: ${weaponStr} | Helmet: ${helmetStr} | Shield: ${shieldStr}`;
+
       modeEl.textContent = getRenderMode() === 'enhanced' ? '[emoji]' : '[ASCII]';
 
       // Messages with transparency fade

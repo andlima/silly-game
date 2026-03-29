@@ -73,6 +73,13 @@ const MONSTER_COLORS = {
   dragon: FG_MAGENTA,
 };
 
+const EQUIPMENT_COLORS = {
+  dagger: FG_WHITE,
+  sword:  FG_WHITE,
+  helmet: FG_CYAN,
+  shield: FG_CYAN,
+};
+
 const KEY_MAP = {
   '\x1b[A': 'n',  // up arrow
   '\x1b[B': 's',  // down arrow
@@ -180,7 +187,8 @@ function render() {
         if (itemGlyph.wide) {
           line += cell('', itemGlyph);
         } else {
-          line += cell(FG_MAGENTA, itemGlyph);
+          const itemColor = EQUIPMENT_COLORS[c.item.type] || FG_MAGENTA;
+          line += cell(itemColor, itemGlyph);
         }
       } else if (c.tile === WALL) {
         const shade = wallShade(c.x, c.y, c.brightness);
@@ -204,6 +212,13 @@ function render() {
   out += `  ${FG_MAGENTA}Potions: ${game.inventory.potions}${RESET}`;
   out += `  ${FG_GREY}${modeLabel}${RESET}`;
   out += `  |  ${FG_GREY}p:potion  >/.:descend  Tab:toggle  q:quit${RESET}\n`;
+
+  // Equipment HUD
+  const eq = game.equipment;
+  const weaponStr = eq.weapon ? `${eq.weapon.name} +${eq.weapon.bonus}atk` : '-';
+  const helmetStr = eq.helmet ? `${eq.helmet.name} +${eq.helmet.bonus}def` : '-';
+  const shieldStr = eq.shield ? `${eq.shield.name} +${eq.shield.bonus}def` : '-';
+  out += `${FG_GREY}Weapon: ${FG_WHITE}${weaponStr}${RESET} ${FG_GREY}| Helmet: ${FG_CYAN}${helmetStr}${RESET} ${FG_GREY}| Shield: ${FG_CYAN}${shieldStr}${RESET}\n`;
 
   for (const msg of game.messages) {
     out += `${FG_YELLOW}${msg}${RESET}\n`;
