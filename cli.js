@@ -27,6 +27,29 @@ const FG_DARK_GREEN = `${ESC}38;5;22m`;
 const FG_WALL_GREY = `${ESC}38;5;240m`;
 const FG_HP_LOST = `${ESC}38;5;238m`;
 
+// Blue-grey wall brightness levels (dark → bright, ANSI 256-color)
+const WALL_SHADES = [60, 61, 66, 67];
+// Floor brightness levels (very dark grey shades)
+const FLOOR_SHADES = [233, 234, 235, 236];
+// Stair brightness levels
+const STAIR_SHADES = [23, 30, 37, 44];
+// Remembered (explored but not visible) tile colors
+const REMEMBERED_WALL = `${ESC}38;5;238m`;
+const REMEMBERED_FLOOR = `${ESC}38;5;233m`;
+const REMEMBERED_STAIR = `${ESC}38;5;237m`;
+
+function fg256(code) {
+  return `${ESC}38;5;${code}m`;
+}
+
+// Map brightness (0.0–1.0) to a shade index (0–3)
+function brightnessToIndex(brightness) {
+  if (brightness <= 0.25) return 0;
+  if (brightness <= 0.50) return 1;
+  if (brightness <= 0.75) return 2;
+  return 3;
+}
+
 const MONSTER_COLORS = {
   rat: FG_BROWN,
   goblin: FG_GREEN,
@@ -103,11 +126,11 @@ function render() {
 
       if (c.visibility === 'revealed') {
         if (c.tile === WALL) {
-          line += cell(FG_DARK_GREY, GLYPHS.wall);
+          line += cell(REMEMBERED_WALL, GLYPHS.wall);
         } else if (c.tile === STAIR) {
-          line += cell(FG_DARK_GREY, GLYPHS.stair);
+          line += cell(REMEMBERED_STAIR, GLYPHS.stair);
         } else if (c.tile === FLOOR) {
-          line += cell(FG_DARK_GREY, GLYPHS.floor);
+          line += cell(REMEMBERED_FLOOR, GLYPHS.floor);
         } else {
           line += '  ';
         }
@@ -134,11 +157,14 @@ function render() {
           line += cell(FG_MAGENTA, itemGlyph);
         }
       } else if (c.tile === WALL) {
-        line += cell(FG_WALL_GREY, GLYPHS.wall);
+        const shade = WALL_SHADES[brightnessToIndex(c.brightness)];
+        line += cell(fg256(shade), GLYPHS.wall);
       } else if (c.tile === STAIR) {
-        line += cell(FG_CYAN, GLYPHS.stair);
+        const shade = STAIR_SHADES[brightnessToIndex(c.brightness)];
+        line += cell(fg256(shade), GLYPHS.stair);
       } else if (c.tile === FLOOR) {
-        line += cell(FG_DARK_GREEN, GLYPHS.floor);
+        const shade = FLOOR_SHADES[brightnessToIndex(c.brightness)];
+        line += cell(fg256(shade), GLYPHS.floor);
       } else {
         line += '  ';
       }
