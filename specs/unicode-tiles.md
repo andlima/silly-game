@@ -68,9 +68,9 @@ emoji.
 
 ### Web renderer (`index.html`)
 
-9. The canvas renders the new glyphs using the same `fillText` approach.
-   Tile size may be increased (e.g., from 18 to 24 px) if emoji render too
-   small at the current size.
+9. Tile size is increased from 18px to 24px (font from 16px to 22px) so
+   emoji render clearly. The canvas renders the new glyphs using the same
+   `fillText` approach.
 
 10. Emoji are centered within their tile rect. If the default monospace font
     renders emoji poorly, a fallback font stack can be specified (e.g.,
