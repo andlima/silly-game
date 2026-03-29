@@ -14,7 +14,7 @@ description: Replace ASCII glyphs with Unicode symbols and emoji for richer tile
 
 Replace plain ASCII characters with Unicode symbols and emoji to give the game
 a richer visual identity. Both the TUI and web renderers get upgraded glyphs,
-with the TUI using a 3-column-per-tile layout to accommodate double-width
+with the TUI using a 2-column-per-tile layout to accommodate double-width
 emoji.
 
 ## Acceptance Criteria
@@ -26,9 +26,9 @@ emoji.
 
    | Entity       | Current | New glyph | Notes                  |
    |--------------|---------|-----------|------------------------|
-   | Player       | `@`     | `@`       | Keep — it's iconic     |
-   | Wall         | `#`     | `█` or connected box-drawing | Single-width block |
-   | Floor        | `.`     | `·` (middle dot U+00B7) | Single-width       |
+   | Player       | `@`     | `@`       | Keep — dark bg, golden fg |
+   | Wall         | `#`     | `██`      | Two consecutive full blocks, no gap |
+   | Floor        | `.`     | ` ` (blank) | Empty space — walls define the shape |
    | Stair down   | `>`     | `▼` or `🪜` | Prefer single-width `▼` in TUI |
    | Rat          | `r`     | `🐀`      | Emoji, double-width    |
    | Goblin       | `g`     | `👺`      | Emoji, double-width    |
@@ -59,19 +59,26 @@ emoji.
 6. Colors still apply — ANSI color codes wrap the glyph as before. Emoji
    render in their native colors (no ANSI color override needed for them).
 
+7. The player `@` renders with a dark/muted background (e.g., dark brown or
+   dark amber) and a golden/yellow foreground — not the current bright yellow
+   background which is too loud.
+
+8. Wall tiles render as `██` (two full-block characters) filling the entire
+   2-column cell with no gaps, creating seamless solid walls.
+
 ### Web renderer (`index.html`)
 
-7. The canvas renders the new glyphs using the same `fillText` approach.
+9. The canvas renders the new glyphs using the same `fillText` approach.
    Tile size may be increased (e.g., from 18 to 24 px) if emoji render too
    small at the current size.
 
-8. Emoji are centered within their tile rect. If the default monospace font
-   renders emoji poorly, a fallback font stack can be specified (e.g.,
-   `"Segoe UI Emoji", "Noto Color Emoji", monospace`).
+10. Emoji are centered within their tile rect. If the default monospace font
+    renders emoji poorly, a fallback font stack can be specified (e.g.,
+    `"Segoe UI Emoji", "Noto Color Emoji", monospace`).
 
 ### Rendering mode toggle (stretch goal)
 
-9. A toggle between "classic" (ASCII) and "enhanced" (Unicode/emoji) mode,
+11. A toggle between "classic" (ASCII) and "enhanced" (Unicode/emoji) mode,
    stored in a simple config or query param for web / command-line flag for
    CLI. If not implemented, default to enhanced mode.
 
@@ -88,9 +95,15 @@ emoji.
   leading space (` X`) while emoji fill both columns naturally (`🐀`).
 - At 80 columns, the TUI viewport is ~40 tiles wide. At 120 columns, ~60
   tiles. Both are more than sufficient for the existing dungeon sizes.
+- Walls use `██` (two full blocks) to fill the 2-column cell completely,
+  creating seamless walls with no visible gaps between adjacent wall tiles.
+- Floors are blank — the walls already define room/corridor shapes clearly,
+  and empty floors let emoji monsters and items stand out better.
+- The player `@` uses a dark background (e.g., `\x1b[48;5;94m` dark amber)
+  with golden foreground — visible but not glaring.
 - `visual-polish` already changes wall tiles to `█` and floors to `·` in the
-  CLI. This spec extends that by moving the glyph table to a shared module,
-  adding emoji for entities, and adopting the 3-column grid.
+  CLI. This spec overrides those choices: `██` for walls, blank for floors,
+  and moves the glyph table to a shared module with emoji for entities.
 - For the web canvas, emoji font rendering varies by OS. The font stack
   fallback ensures coverage on Windows (Segoe UI Emoji), Linux (Noto Color
   Emoji), and macOS (Apple Color Emoji — usually automatic).
