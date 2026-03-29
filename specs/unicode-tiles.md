@@ -47,14 +47,14 @@ emoji.
 
 ### TUI renderer (`cli.js`)
 
-4. Every tile cell is rendered as exactly 3 terminal columns:
-   - Single-width glyph: ` X ` (space, char, space)
-   - Double-width (emoji) glyph: ` 🐀` (space, emoji — the emoji fills 2 cols)
+4. Every tile cell is rendered as exactly 2 terminal columns:
+   - Single-width glyph: ` X` (leading space + char)
+   - Double-width (emoji) glyph: `🐀` (emoji fills both columns)
 
    This keeps the grid perfectly aligned regardless of glyph width.
 
-5. The viewport tile count is recalculated based on the 3-column cell width
-   (roughly `floor(columns / 3)` tiles across).
+5. The viewport tile count is recalculated based on the 2-column cell width
+   (roughly `floor(columns / 2)` tiles across).
 
 6. Colors still apply — ANSI color codes wrap the glyph as before. Emoji
    render in their native colors (no ANSI color override needed for them).
@@ -84,11 +84,10 @@ emoji.
 
 ## Design Notes
 
-- The 3-column TUI layout was chosen over 2-column because it gives cleaner
-  alignment: single-width chars get balanced padding (` X `) while emoji
-  (` 🐀`) naturally fill the same 3 columns with just a leading space.
-- At 80 columns, the TUI viewport is ~26 tiles wide. At 120 columns, ~40
-  tiles. Both are sufficient for the existing dungeon sizes.
+- The 2-column TUI layout is compact and clean: single-width chars get a
+  leading space (` X`) while emoji fill both columns naturally (`🐀`).
+- At 80 columns, the TUI viewport is ~40 tiles wide. At 120 columns, ~60
+  tiles. Both are more than sufficient for the existing dungeon sizes.
 - `visual-polish` already changes wall tiles to `█` and floors to `·` in the
   CLI. This spec extends that by moving the glyph table to a shared module,
   adding emoji for entities, and adopting the 3-column grid.
@@ -102,7 +101,7 @@ emoji.
   glyphs there overlap with this spec. Extend rather than duplicate that work.
 - The key TUI change is the cell-width logic. Search for where the output
   string is built character by character in `cli.js` and replace direct char
-  concatenation with a helper that pads to 3 columns based on the `wide` flag.
+  concatenation with a helper that pads to 2 columns based on the `wide` flag.
 - Test in a real terminal (not just the web preview). Verify alignment with
   mixed emoji and single-width chars on the same row.
 - The `getVisibleTiles` function in `src/game.js` returns tile/entity data —
