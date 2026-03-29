@@ -103,6 +103,7 @@
     <span class="potions" id="hud-potions"></span>
     <span class="equipment" id="hud-equipment"></span>
     <span class="mode" id="hud-mode"></span>
+    <button id="mute-btn" style="font-family:monospace;font-size:16px;background:none;border:1px solid #444;color:#888;cursor:pointer;padding:2px 8px;border-radius:3px" title="Toggle sound">&#x1f50a;</button>
   </div>
   <div id="messages"></div>
   <div id="overlay">
@@ -112,6 +113,7 @@
   <script type="module">
     import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR, EQUIPMENT_TYPES } from './src/game.js';
     import { GLYPHS, toggleRenderMode, getRenderMode } from './src/glyphs.js';
+    import { initAudio, setVolume, getVolume, playMove, playAttack, playHurt, playPickup, playDescend, playDeath, playVictory } from './src/audio.js';
 
     const TILE_SIZE = 24;
     const FONT_SIZE = 22;
@@ -362,8 +364,46 @@
       }
     }
 
+    let audioReady = false;
+
+    function playAudioForDiff(oldGame, newGame) {
+      if (!audioReady) return;
+      if (newGame.won && !oldGame.won) { playVictory(); return; }
+      if (newGame.gameOver && !oldGame.gameOver) { playDeath(); return; }
+      if (newGame.level > oldGame.level) { playDescend(); return; }
+      if (newGame.player.hp < oldGame.player.hp) playHurt();
+      // Check if a monster lost HP (player attacked)
+      if (newGame.level === oldGame.level) {
+        const oldMonsters = new Map(oldGame.monsters.map(m => [m.id !== undefined ? m.id : `${m.x},${m.y}`, m]));
+        for (const nm of newGame.monsters) {
+          const key = nm.id !== undefined ? nm.id : `${nm.x},${nm.y}`;
+          const om = oldMonsters.get(key);
+          if (om && nm.hp < om.hp) { playAttack(); break; }
+        }
+        // Monster killed (fewer monsters) also counts as attack
+        if (newGame.monsters.length < oldGame.monsters.length) playAttack();
+      }
+      if (newGame.inventory.potions > oldGame.inventory.potions ||
+          (newGame.items && oldGame.items && newGame.items.length < oldGame.items.length)) {
+        playPickup();
+      }
+      if (newGame.player.x !== oldGame.player.x || newGame.player.y !== oldGame.player.y) playMove();
+    }
+
+    function dispatchAndPlay(action) {
+      const oldGame = game;
+      game = dispatch(game, action);
+      playAudioForDiff(oldGame, game);
+      render();
+    }
+
     document.addEventListener('keydown', (e) => {
-      // Tab toggles render mode (ASCII/emoji)
+      if (!audioReady) {
+        initAudio();
+        audioReady = true;
+      }
+
+      // Tab toggles render mode even during game over/win
       if (e.key === 'Tab') {
         e.preventDefault();
         toggleRenderMode();
@@ -384,29 +424,40 @@
       const dir = KEY_MAP[e.key];
       if (dir) {
         e.preventDefault();
-        game = dispatch(game, { type: 'move', dir });
-        render();
+        dispatchAndPlay({ type: 'move', dir });
         return;
       }
 
       if (e.key === '.' || e.key === '>') {
         e.preventDefault();
-        game = dispatch(game, { type: 'descend' });
-        render();
+        dispatchAndPlay({ type: 'descend' });
         return;
       }
 
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
-        game = dispatch(game, { type: 'usePotion' });
-        render();
+        dispatchAndPlay({ type: 'usePotion' });
         return;
       }
 
       if (e.key === '5') {
         e.preventDefault();
-        game = dispatch(game, { type: 'wait' });
-        render();
+        dispatchAndPlay({ type: 'wait' });
+      }
+    });
+
+    // Mute toggle
+    const muteBtn = document.getElementById('mute-btn');
+    let savedVolume = 0.5;
+    muteBtn.addEventListener('click', () => {
+      if (!audioReady) { initAudio(); audioReady = true; }
+      if (getVolume() > 0) {
+        savedVolume = getVolume();
+        setVolume(0);
+        muteBtn.textContent = '\u{1f507}';
+      } else {
+        setVolume(savedVolume);
+        muteBtn.textContent = '\u{1f50a}';
       }
     });
 
