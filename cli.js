@@ -20,6 +20,12 @@ const CLEAR = `${ESC}2J${ESC}H`;
 const HIDE_CURSOR = `${ESC}?25l`;
 const SHOW_CURSOR = `${ESC}?25h`;
 
+// 256-color helpers
+const FG_DARK_GREY = `${ESC}90m`;
+const FG_DARK_GREEN = `${ESC}38;5;22m`;
+const FG_WALL_GREY = `${ESC}38;5;240m`;
+const FG_HP_LOST = `${ESC}38;5;238m`;
+
 const MONSTER_COLORS = {
   rat: FG_BROWN,
   goblin: FG_GREEN,
@@ -45,6 +51,18 @@ function getViewSize() {
   return { cols: Math.max(10, cols), rows: Math.max(6, rows) };
 }
 
+function hpBar(hp, maxHp) {
+  const barWidth = 20;
+  const filled = maxHp > 0 ? Math.round((hp / maxHp) * barWidth) : 0;
+  const empty = barWidth - filled;
+  const pct = maxHp > 0 ? hp / maxHp : 0;
+  let color;
+  if (pct > 0.6) color = FG_GREEN;
+  else if (pct > 0.3) color = FG_YELLOW;
+  else color = FG_RED;
+  return `HP ${color}[${'#'.repeat(filled)}${FG_HP_LOST}${'.'.repeat(empty)}${color}]${RESET} ${hp}/${maxHp}`;
+}
+
 function render() {
   if (game.gameOver) {
     renderGameOver();
@@ -60,8 +78,6 @@ function render() {
 
   let out = CLEAR + BG_BLACK;
 
-  const FG_DARK_GREY = `${ESC}90m`;
-
   for (let vy = 0; vy < visible.length; vy++) {
     let line = '';
     for (let vx = 0; vx < visible[vy].length; vx++) {
@@ -73,20 +89,19 @@ function render() {
       }
 
       if (cell.visibility === 'revealed') {
-        // Dark grey for all remembered tiles
         if (cell.tile === WALL) {
-          line += `${FG_DARK_GREY}#`;
+          line += `${FG_DARK_GREY}\u2588`;
         } else if (cell.tile === STAIR) {
           line += `${FG_DARK_GREY}>`;
         } else if (cell.tile === FLOOR) {
-          line += `${FG_DARK_GREY}.`;
+          line += `${FG_DARK_GREY}\u00b7`;
         } else {
           line += ' ';
         }
         continue;
       }
 
-      // Visible tiles — normal colors
+      // Visible tiles
       if (cell.isPlayer) {
         line += `${BG_YELLOW}${FG_BLACK}@${RESET}${BG_BLACK}`;
       } else if (cell.monster) {
@@ -95,11 +110,11 @@ function render() {
       } else if (cell.item) {
         line += `${FG_MAGENTA}${cell.item.char}`;
       } else if (cell.tile === WALL) {
-        line += `${FG_WHITE}#`;
+        line += `${FG_WALL_GREY}\u2588`;
       } else if (cell.tile === STAIR) {
         line += `${FG_CYAN}>`;
       } else if (cell.tile === FLOOR) {
-        line += `${FG_GREEN}.`;
+        line += `${FG_DARK_GREEN}\u00b7`;
       } else {
         line += ' ';
       }
@@ -107,7 +122,7 @@ function render() {
     out += line + RESET + '\n';
   }
 
-  out += `${FG_RED}HP: ${game.player.hp}/${game.player.maxHp}${RESET}`;
+  out += hpBar(game.player.hp, game.player.maxHp);
   out += `  ${FG_CYAN}Level: ${game.level}${RESET}`;
   out += `  ${FG_MAGENTA}Potions: ${game.inventory.potions}${RESET}`;
   out += `  |  ${FG_GREY}p:potion  >/.:descend  q:quit${RESET}\n`;
