@@ -115,7 +115,7 @@
     import { GLYPHS, toggleRenderMode, getRenderMode } from './src/glyphs.js';
     import { initAudio, setVolume, getVolume, playMove, playAttack, playHurt, playPickup, playDescend, playDeath, playVictory } from './src/audio.js';
 
-    const TILE_SIZE = 24;
+    const TILE_SIZE = 28;
     const FONT_SIZE = 22;
     const EMOJI_FONT = '"Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", monospace';
     const canvas = document.getElementById('game');
@@ -274,18 +274,21 @@
 
       // Minimap overlay
       if (minimapVisible) {
+        const MINIMAP_SCALE = 3;
         const mapW = game.map.width;
         const mapH = game.map.height;
+        const scaledW = mapW * MINIMAP_SCALE;
+        const scaledH = mapH * MINIMAP_SCALE;
         const margin = 10;
         const border = 1;
-        const mmX = canvas.width - mapW - margin - border * 2;
+        const mmX = canvas.width - scaledW - margin - border * 2;
         const mmY = margin;
 
         // Dark background with border
         ctx.fillStyle = '#111';
-        ctx.fillRect(mmX - border, mmY - border, mapW + border * 2, mapH + border * 2);
+        ctx.fillRect(mmX - border, mmY - border, scaledW + border * 2, scaledH + border * 2);
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(mmX, mmY, mapW, mapH);
+        ctx.fillRect(mmX, mmY, scaledW, scaledH);
 
         for (let y = 0; y < mapH; y++) {
           for (let x = 0; x < mapW; x++) {
@@ -307,7 +310,7 @@
               ctx.fillStyle = tile === WALL ? '#666' : '#333';
             }
 
-            ctx.fillRect(mmX + x, mmY + y, 1, 1);
+            ctx.fillRect(mmX + x * MINIMAP_SCALE, mmY + y * MINIMAP_SCALE, MINIMAP_SCALE, MINIMAP_SCALE);
           }
         }
       }
@@ -415,6 +418,28 @@
       if (e.key === 'm' || e.key === 'M') {
         e.preventDefault();
         minimapVisible = !minimapVisible;
+        render();
+        return;
+      }
+
+      // 'n' toggles sound mute/unmute
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        if (getVolume() > 0) {
+          savedVolume = getVolume();
+          setVolume(0);
+          muteBtn.textContent = '\u{1f507}';
+        } else {
+          setVolume(savedVolume);
+          muteBtn.textContent = '\u{1f50a}';
+        }
+        return;
+      }
+
+      // 'r' restarts the game
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        game = dispatch(game, { type: 'restart' });
         render();
         return;
       }
