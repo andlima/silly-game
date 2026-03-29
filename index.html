@@ -7,7 +7,7 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background: #000;
+      background: #0a0a0a;
       color: #aaa;
       font-family: monospace;
       display: flex;
@@ -20,19 +20,49 @@
       margin-top: 8px;
       font-size: 16px;
       color: #888;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 8px 16px;
+      border-top: 1px solid #222;
     }
-    #hud .hp { color: #ff4444; font-weight: bold; }
+    #hp-bar-container {
+      position: relative;
+      width: 160px;
+      height: 18px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #hp-bar-fill {
+      height: 100%;
+      transition: width 0.15s;
+    }
+    #hp-bar-text {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 0 0 2px #000, 0 0 4px #000;
+    }
     #hud .level { color: #44aaff; font-weight: bold; }
-    #hud .potions { color: #ff44ff; font-weight: bold; }
+    #hud .potions { color: #dd55cc; font-weight: bold; }
     #messages {
       margin-top: 4px;
       font-size: 14px;
-      color: #ccaa44;
       text-align: left;
       width: 100%;
       max-width: 800px;
       padding: 0 20px;
       line-height: 1.4;
+    }
+    #messages .msg-line {
+      color: #ccaa44;
     }
     #overlay {
       display: none;
@@ -62,7 +92,14 @@
 </head>
 <body>
   <canvas id="game"></canvas>
-  <div id="hud"></div>
+  <div id="hud">
+    <div id="hp-bar-container">
+      <div id="hp-bar-fill"></div>
+      <div id="hp-bar-text"></div>
+    </div>
+    <span class="level" id="hud-level"></span>
+    <span class="potions" id="hud-potions"></span>
+  </div>
   <div id="messages"></div>
   <div id="overlay">
     <h1 id="overlay-title">Game Over</h1>
@@ -70,8 +107,10 @@
   </div>
   <script type="module">
     import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR } from './src/game.js';
+    import { GLYPHS } from './src/glyphs.js';
 
-    const TILE_SIZE = 18;
+    const TILE_SIZE = 24;
+    const EMOJI_FONT = '"Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", monospace';
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const hud = document.getElementById('hud');
@@ -82,14 +121,16 @@
 
     let game = createGame();
 
+    // Refined color palette
+    const WALL_SHADES = ['#3a3a4a', '#40405a', '#4a4a5a'];
+    const FLOOR_SHADES = ['#1a1a1a', '#1c1c1c', '#1e1e1e'];
+
     const COLORS = {
-      bg:     '#000000',
-      wall:   '#aaaaaa',
-      floor:  '#225522',
-      player: '#ffdd00',
-      floorChar: '#33aa33',
-      stair:  '#44aaff',
-      potion: '#ff44ff',
+      bg:      '#0a0a0a',
+      player:  '#ffcc00',
+      playerBg:'#44380a',
+      stair:   '#5599dd',
+      potion:  '#dd55cc',
     };
 
     const KEY_MAP = {
@@ -106,6 +147,32 @@
       return { cols: Math.max(10, cols), rows: Math.max(6, rows) };
     }
 
+    function scaleColor(hex, factor) {
+      const r = Math.round(parseInt(hex.slice(1, 3), 16) * factor);
+      const g = Math.round(parseInt(hex.slice(3, 5), 16) * factor);
+      const b = Math.round(parseInt(hex.slice(5, 7), 16) * factor);
+      return `rgb(${Math.min(255,r)},${Math.min(255,g)},${Math.min(255,b)})`;
+    }
+
+    function revealedColor(hex) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      const grey = (r + g + b) / 3;
+      const rr = Math.round(grey * 0.15 + 20);
+      const gg = Math.round(grey * 0.15 + 25);
+      const bb = Math.round(grey * 0.2 + 40);
+      return `rgb(${rr},${gg},${bb})`;
+    }
+
+    function wallShade(x, y) {
+      return WALL_SHADES[(x * 7 + y * 13) % 3];
+    }
+
+    function floorShade(x, y) {
+      return FLOOR_SHADES[(x * 7 + y * 13) % 3];
+    }
+
     function render() {
       const { cols, rows } = getViewSize();
       canvas.width = cols * TILE_SIZE;
@@ -116,7 +183,6 @@
       ctx.fillStyle = COLORS.bg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.font = `${TILE_SIZE - 2}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
@@ -125,37 +191,101 @@
           const cell = visible[vy][vx];
           const px = vx * TILE_SIZE;
           const py = vy * TILE_SIZE;
+          const cx = px + TILE_SIZE / 2;
+          const cy = py + TILE_SIZE / 2;
+          const mx = cell.x;
+          const my = cell.y;
+
+          if (cell.visibility === 'hidden') continue;
+
+          if (cell.visibility === 'revealed') {
+            if (cell.tile === WALL) {
+              ctx.fillStyle = revealedColor(wallShade(mx, my));
+              ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            } else if (cell.tile === STAIR) {
+              ctx.font = `${TILE_SIZE - 2}px monospace`;
+              ctx.fillStyle = revealedColor(COLORS.stair);
+              ctx.fillText(GLYPHS.stair.char, cx, cy);
+            } else if (cell.tile === FLOOR) {
+              ctx.fillStyle = revealedColor(floorShade(mx, my));
+              ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            }
+            continue;
+          }
+
+          // Visible tiles — apply brightness scaling
+          const b = cell.brightness;
+
+          // Draw floor background for all visible floor tiles
+          if (cell.tile === FLOOR || cell.tile === STAIR) {
+            ctx.fillStyle = scaleColor(floorShade(mx, my), b);
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
 
           if (cell.isPlayer) {
-            ctx.fillStyle = COLORS.player;
-            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-            ctx.fillStyle = '#000';
-            ctx.fillText('@', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+            ctx.font = `${TILE_SIZE - 2}px monospace`;
+            ctx.fillStyle = scaleColor(COLORS.playerBg, b);
+            ctx.fillRect(px - 1, py - 1, TILE_SIZE + 2, TILE_SIZE + 2);
+            ctx.fillStyle = scaleColor(COLORS.player, b);
+            ctx.fillText(GLYPHS.player.char, cx, cy);
           } else if (cell.monster) {
-            ctx.fillStyle = cell.monster.color;
-            ctx.fillText(cell.monster.char, px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+            const glyph = GLYPHS[cell.monster.type];
+            if (glyph && glyph.wide) {
+              ctx.font = `${TILE_SIZE - 4}px ${EMOJI_FONT}`;
+              ctx.fillText(glyph.char, cx, cy);
+            } else {
+              ctx.font = `${TILE_SIZE - 2}px monospace`;
+              ctx.fillStyle = scaleColor(cell.monster.color, Math.min(1, b * 1.15));
+              ctx.fillText((glyph || { char: cell.monster.char }).char, cx, cy);
+            }
           } else if (cell.item) {
-            ctx.fillStyle = cell.item.color;
-            ctx.fillText(cell.item.char, px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+            const glyph = GLYPHS[cell.item.type];
+            if (glyph && glyph.wide) {
+              ctx.font = `${TILE_SIZE - 4}px ${EMOJI_FONT}`;
+              ctx.fillText(glyph.char, cx, cy);
+            } else {
+              ctx.font = `${TILE_SIZE - 2}px monospace`;
+              ctx.fillStyle = scaleColor(cell.item.color, b);
+              ctx.fillText((glyph || { char: cell.item.char }).char, cx, cy);
+            }
           } else if (cell.tile === WALL) {
-            ctx.fillStyle = '#333';
+            ctx.fillStyle = scaleColor(wallShade(mx, my), b);
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-            ctx.fillStyle = COLORS.wall;
-            ctx.fillText('#', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
           } else if (cell.tile === STAIR) {
-            ctx.fillStyle = COLORS.stair;
-            ctx.fillText('>', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
-          } else if (cell.tile === FLOOR) {
-            ctx.fillStyle = COLORS.floorChar;
-            ctx.fillText('.', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+            ctx.font = `${TILE_SIZE - 2}px monospace`;
+            ctx.fillStyle = scaleColor(COLORS.stair, b);
+            ctx.fillText(GLYPHS.stair.char, cx, cy);
           }
         }
       }
 
-      hud.innerHTML = `<span class="hp">HP: ${game.player.hp}/${game.player.maxHp}</span>` +
-        `  <span class="level">Level: ${game.level}</span>` +
-        `  <span class="potions">Potions: ${game.inventory.potions}</span>`;
-      messagesEl.textContent = game.messages.join('\n');
+      // HUD: HP bar
+      const hp = game.player.hp;
+      const maxHp = game.player.maxHp;
+      const pct = maxHp > 0 ? hp / maxHp : 0;
+      const hpFill = document.getElementById('hp-bar-fill');
+      const hpText = document.getElementById('hp-bar-text');
+      let barColor;
+      if (pct > 0.6) barColor = '#44aa44';
+      else if (pct > 0.3) barColor = '#ccaa22';
+      else barColor = '#cc3333';
+      hpFill.style.width = `${Math.round(pct * 100)}%`;
+      hpFill.style.background = barColor;
+      hpText.textContent = `${hp}/${maxHp}`;
+
+      document.getElementById('hud-level').textContent = `Level: ${game.level}`;
+      document.getElementById('hud-potions').textContent = `Potions: ${game.inventory.potions}`;
+
+      // Messages with transparency fade
+      const msgs = game.messages;
+      let msgHtml = '';
+      for (let i = 0; i < msgs.length; i++) {
+        // newest message is last in array
+        const age = msgs.length - 1 - i;
+        const opacity = Math.max(0.4, 1.0 - age * 0.15);
+        msgHtml += `<div class="msg-line" style="opacity:${opacity}">${msgs[i]}</div>`;
+      }
+      messagesEl.innerHTML = msgHtml;
 
       if (game.gameOver) {
         overlayTitle.textContent = 'Game Over';
