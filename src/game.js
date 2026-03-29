@@ -1,4 +1,5 @@
 import { createMap, isWalkable, getTile } from './map.js';
+import { computeFOV, TORCH_RADIUS } from './fov.js';
 
 export { FLOOR, WALL, STAIR } from './map.js';
 
@@ -39,6 +40,15 @@ function newLevel(state) {
   const monsters = spawnMonsters(map, state.level);
   const items = spawnPotions(map, monsters);
   placeStair(map);
+
+  // Initialize revealed array (all false) and compute initial FOV
+  const revealed = Array.from({ length: map.height }, () => new Array(map.width).fill(false));
+  const fov = computeFOV(map, player.x, player.y, TORCH_RADIUS);
+  for (const key of fov.keys()) {
+    const [rx, ry] = key.split(',').map(Number);
+    revealed[ry][rx] = true;
+  }
+
   return {
     map,
     player,
@@ -49,6 +59,8 @@ function newLevel(state) {
     messages: state.messages,
     gameOver: false,
     won: false,
+    revealed,
+    fov,
   };
 }
 
@@ -117,23 +129,39 @@ function pickMonsterType(level) {
   return Math.random() < 0.5 ? 'rat' : 'goblin';
 }
 
+function updateFOV(game) {
+  const fov = computeFOV(game.map, game.player.x, game.player.y, TORCH_RADIUS);
+  const revealed = game.revealed.map(row => [...row]);
+  for (const key of fov.keys()) {
+    const [rx, ry] = key.split(',').map(Number);
+    revealed[ry][rx] = true;
+  }
+  return { ...game, fov, revealed };
+}
+
 export function dispatch(game, action) {
   if ((game.gameOver || game.won) && action.type !== 'restart') return game;
 
+  let next;
   switch (action.type) {
     case 'move':
-      return handleMove(game, action.dir);
+      next = handleMove(game, action.dir);
+      break;
     case 'wait':
-      return runMonsterTurns(game);
+      next = runMonsterTurns(game);
+      break;
     case 'descend':
-      return handleDescend(game);
+      next = handleDescend(game);
+      break;
     case 'usePotion':
-      return handleUsePotion(game);
+      next = handleUsePotion(game);
+      break;
     case 'restart':
       return createGame();
     default:
       return game;
   }
+  return updateFOV(next);
 }
 
 function handleMove(game, dir) {
@@ -311,10 +339,12 @@ function tryMonsterMove(map, monsters, player, monsterIdx, dx, dy) {
 
 /**
  * Return a 2D slice of the map centered on the player, sized viewW × viewH.
- * Each cell is { tile, isPlayer, monster, item }.
+ * Each cell is { tile, isPlayer, monster, item, visibility, brightness }.
+ * visibility: "visible" | "revealed" | "hidden"
+ * brightness: 0.0–1.0 (only meaningful when visibility is "visible")
  */
 export function getVisibleTiles(game, viewW, viewH) {
-  const { map, player, monsters, items } = game;
+  const { map, player, monsters, items, fov, revealed } = game;
 
   let camX = player.x - Math.floor(viewW / 2);
   let camY = player.y - Math.floor(viewH / 2);
@@ -342,14 +372,28 @@ export function getVisibleTiles(game, viewW, viewH) {
       const mx = camX + vx;
       const my = camY + vy;
       const inBounds = mx >= 0 && mx < map.width && my >= 0 && my < map.height;
+      const key = `${mx},${my}`;
+      const isVisible = fov && fov.has(key);
+      const isRevealed = inBounds && revealed && revealed[my][mx];
+
+      let visibility;
+      if (isVisible) visibility = 'visible';
+      else if (isRevealed) visibility = 'revealed';
+      else visibility = 'hidden';
+
       const tile = inBounds ? map.tiles[my][mx] : ' ';
-      const monster = monsterAt[`${mx},${my}`] || null;
-      const item = itemAt[`${mx},${my}`] || null;
+      // Only show monsters and items in visible cells
+      const monster = visibility === 'visible' ? (monsterAt[key] || null) : null;
+      const item = visibility === 'visible' ? (itemAt[key] || null) : null;
+      const bright = isVisible ? fov.get(key) : 0;
+
       row.push({
         tile,
         isPlayer: mx === player.x && my === player.y,
         monster,
         item,
+        visibility,
+        brightness: bright,
       });
     }
     result.push(row);
