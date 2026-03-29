@@ -149,7 +149,7 @@ describe('tryMonsterMove', () => {
 
   it('monster does not walk through another monster', () => {
     const m1 = makeMonster({ x: 4, y: 2 });
-    const m2 = makeMonster({ x: 3, y: 2, type: 'goblin', name: 'Goblin' });
+    const m2 = makeMonster({ x: 3, y: 2, type: 'skeleton', name: 'Skeleton' });
     const game = makeGame({ monsters: [m1, m2] });
     const next = dispatch(game, { type: 'wait' });
     // m1 tries to move to x=3 but m2 is there; should try fallback or stay

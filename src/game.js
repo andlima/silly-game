@@ -11,10 +11,10 @@ const DIRECTIONS = {
 };
 
 const MONSTER_TYPES = {
-  rat:    { name: 'Rat',    char: 'r', color: '#cc6633', hp: 5,  attack: 2, defense: 0 },
-  goblin: { name: 'Goblin', char: 'g', color: '#33cc33', hp: 10, attack: 4, defense: 1 },
-  orc:    { name: 'Orc',    char: 'o', color: '#ff6600', hp: 20, attack: 6, defense: 3 },
-  troll:  { name: 'Troll',  char: 'T', color: '#cc00cc', hp: 30, attack: 8, defense: 4 },
+  rat:      { name: 'Rat',      char: 'r', color: '#cc6633', hp: 5,  attack: 2, defense: 0 },
+  skeleton: { name: 'Skeleton', char: 's', color: '#cccccc', hp: 10, attack: 4, defense: 1 },
+  bear:     { name: 'Bear',     char: 'b', color: '#996633', hp: 20, attack: 6, defense: 3 },
+  dragon:   { name: 'Dragon',   char: 'd', color: '#cc00cc', hp: 30, attack: 8, defense: 4 },
 };
 
 const PLAYER_STATS = { hp: 30, maxHp: 30, attack: 5, defense: 2 };
@@ -126,9 +126,9 @@ function spawnMonsters(map, level) {
 
 function pickMonsterType(level) {
   const roll = Math.random();
-  if (level >= 4 && roll < 0.15) return 'troll';
-  if (level >= 3 && roll < 0.35) return 'orc';
-  return Math.random() < 0.5 ? 'rat' : 'goblin';
+  if (level >= 4 && roll < 0.15) return 'dragon';
+  if (level >= 3 && roll < 0.35) return 'bear';
+  return Math.random() < 0.5 ? 'rat' : 'skeleton';
 }
 
 function updateFOV(game) {
