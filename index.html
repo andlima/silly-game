@@ -126,6 +126,7 @@
     const modeEl = document.getElementById('hud-mode');
 
     let game = createGame();
+    let minimapVisible = true;
 
     // Refined color palette
     const WALL_SHADES = ['#3a3a4a', '#40405a', '#4a4a5a'];
@@ -265,6 +266,46 @@
         }
       }
 
+      // Minimap overlay
+      if (minimapVisible) {
+        const mapW = game.map.width;
+        const mapH = game.map.height;
+        const margin = 10;
+        const border = 1;
+        const mmX = canvas.width - mapW - margin - border * 2;
+        const mmY = margin;
+
+        // Dark background with border
+        ctx.fillStyle = '#111';
+        ctx.fillRect(mmX - border, mmY - border, mapW + border * 2, mapH + border * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(mmX, mmY, mapW, mapH);
+
+        for (let y = 0; y < mapH; y++) {
+          for (let x = 0; x < mapW; x++) {
+            if (!game.revealed[y][x]) continue;
+
+            const inFOV = game.fov.has(`${x},${y}`);
+            const tile = game.map.tiles[y][x];
+
+            // Check for player
+            if (x === game.player.x && y === game.player.y) {
+              ctx.fillStyle = '#ffcc00';
+            } else if (inFOV && game.monsters.some(m => m.x === x && m.y === y)) {
+              ctx.fillStyle = '#cc3333';
+            } else if (tile === STAIR) {
+              ctx.fillStyle = '#5599dd';
+            } else if (inFOV) {
+              ctx.fillStyle = tile === WALL ? '#999' : '#555';
+            } else {
+              ctx.fillStyle = tile === WALL ? '#666' : '#333';
+            }
+
+            ctx.fillRect(mmX + x, mmY + y, 1, 1);
+          }
+        }
+      }
+
       // HUD: HP bar
       const hp = game.player.hp;
       const maxHp = game.player.maxHp;
@@ -348,6 +389,14 @@
 
       // Tab toggles render mode even during game over/win
       if (e.key === 'Tab') {
+        e.preventDefault();
+        minimapVisible = !minimapVisible;
+        render();
+        return;
+      }
+
+      // 'm' toggles render mode (ASCII/emoji)
+      if (e.key === 'm' || e.key === 'M') {
         e.preventDefault();
         toggleRenderMode();
         render();
