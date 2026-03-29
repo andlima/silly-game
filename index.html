@@ -107,8 +107,10 @@
   </div>
   <script type="module">
     import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR } from './src/game.js';
+    import { GLYPHS } from './src/glyphs.js';
 
-    const TILE_SIZE = 18;
+    const TILE_SIZE = 24;
+    const EMOJI_FONT = '"Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", monospace';
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const hud = document.getElementById('hud');
@@ -181,7 +183,6 @@
       ctx.fillStyle = COLORS.bg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.font = `${TILE_SIZE - 2}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
@@ -202,10 +203,10 @@
               ctx.fillStyle = revealedColor(wallShade(mx, my));
               ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
             } else if (cell.tile === STAIR) {
+              ctx.font = `${TILE_SIZE - 2}px monospace`;
               ctx.fillStyle = revealedColor(COLORS.stair);
-              ctx.fillText('>', cx, cy);
+              ctx.fillText(GLYPHS.stair.char, cx, cy);
             } else if (cell.tile === FLOOR) {
-              // subtle floor bg for revealed
               ctx.fillStyle = revealedColor(floorShade(mx, my));
               ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
             }
@@ -222,27 +223,39 @@
           }
 
           if (cell.isPlayer) {
-            // Glowing background
+            ctx.font = `${TILE_SIZE - 2}px monospace`;
             ctx.fillStyle = scaleColor(COLORS.playerBg, b);
             ctx.fillRect(px - 1, py - 1, TILE_SIZE + 2, TILE_SIZE + 2);
             ctx.fillStyle = scaleColor(COLORS.player, b);
-            ctx.fillText('@', cx, cy);
+            ctx.fillText(GLYPHS.player.char, cx, cy);
           } else if (cell.monster) {
-            // Monsters slightly brighter against dark floor
-            ctx.fillStyle = scaleColor(cell.monster.color, Math.min(1, b * 1.15));
-            ctx.fillText(cell.monster.char, cx, cy);
+            const glyph = GLYPHS[cell.monster.type];
+            if (glyph && glyph.wide) {
+              ctx.font = `${TILE_SIZE - 4}px ${EMOJI_FONT}`;
+              ctx.fillText(glyph.char, cx, cy);
+            } else {
+              ctx.font = `${TILE_SIZE - 2}px monospace`;
+              ctx.fillStyle = scaleColor(cell.monster.color, Math.min(1, b * 1.15));
+              ctx.fillText((glyph || { char: cell.monster.char }).char, cx, cy);
+            }
           } else if (cell.item) {
-            ctx.fillStyle = scaleColor(cell.item.color, b);
-            ctx.fillText(cell.item.char, cx, cy);
+            const glyph = GLYPHS[cell.item.type];
+            if (glyph && glyph.wide) {
+              ctx.font = `${TILE_SIZE - 4}px ${EMOJI_FONT}`;
+              ctx.fillText(glyph.char, cx, cy);
+            } else {
+              ctx.font = `${TILE_SIZE - 2}px monospace`;
+              ctx.fillStyle = scaleColor(cell.item.color, b);
+              ctx.fillText((glyph || { char: cell.item.char }).char, cx, cy);
+            }
           } else if (cell.tile === WALL) {
-            // Solid filled wall rectangle with color variation
             ctx.fillStyle = scaleColor(wallShade(mx, my), b);
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
           } else if (cell.tile === STAIR) {
+            ctx.font = `${TILE_SIZE - 2}px monospace`;
             ctx.fillStyle = scaleColor(COLORS.stair, b);
-            ctx.fillText('>', cx, cy);
+            ctx.fillText(GLYPHS.stair.char, cx, cy);
           }
-          // Floor-only tiles: background already drawn above, no character needed
         }
       }
 

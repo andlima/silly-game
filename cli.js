@@ -1,4 +1,5 @@
 import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR } from './src/game.js';
+import { GLYPHS } from './src/glyphs.js';
 
 let game = createGame();
 
@@ -44,11 +45,23 @@ const KEY_MAP = {
   'd': 'e', 'D': 'e',
 };
 
+// Each tile cell is 2 terminal columns wide
+const CELL_WIDTH = 2;
+
 function getViewSize() {
-  const cols = (process.stdout.columns || 80) - 2;
+  const termCols = (process.stdout.columns || 80) - 2;
+  const cols = Math.floor(termCols / CELL_WIDTH);
   const msgLines = Math.min(game.messages.length, 5);
   const rows = (process.stdout.rows || 24) - 4 - msgLines; // HUD + messages
   return { cols: Math.max(10, cols), rows: Math.max(6, rows) };
+}
+
+// Render a glyph into a 2-column cell
+function cell(colorCode, glyph) {
+  if (glyph.wide) {
+    return `${colorCode}${glyph.char}`;
+  }
+  return `${colorCode} ${glyph.char}`;
 }
 
 function hpBar(hp, maxHp) {
@@ -81,42 +94,53 @@ function render() {
   for (let vy = 0; vy < visible.length; vy++) {
     let line = '';
     for (let vx = 0; vx < visible[vy].length; vx++) {
-      const cell = visible[vy][vx];
+      const c = visible[vy][vx];
 
-      if (cell.visibility === 'hidden') {
-        line += ' ';
+      if (c.visibility === 'hidden') {
+        line += '  ';
         continue;
       }
 
-      if (cell.visibility === 'revealed') {
-        if (cell.tile === WALL) {
-          line += `${FG_DARK_GREY}\u2588`;
-        } else if (cell.tile === STAIR) {
-          line += `${FG_DARK_GREY}>`;
-        } else if (cell.tile === FLOOR) {
-          line += `${FG_DARK_GREY}\u00b7`;
+      if (c.visibility === 'revealed') {
+        if (c.tile === WALL) {
+          line += cell(FG_DARK_GREY, GLYPHS.wall);
+        } else if (c.tile === STAIR) {
+          line += cell(FG_DARK_GREY, GLYPHS.stair);
+        } else if (c.tile === FLOOR) {
+          line += cell(FG_DARK_GREY, GLYPHS.floor);
         } else {
-          line += ' ';
+          line += '  ';
         }
         continue;
       }
 
       // Visible tiles
-      if (cell.isPlayer) {
-        line += `${BG_YELLOW}${FG_BLACK}@${RESET}${BG_BLACK}`;
-      } else if (cell.monster) {
-        const color = MONSTER_COLORS[cell.monster.type] || FG_WHITE;
-        line += `${color}${cell.monster.char}`;
-      } else if (cell.item) {
-        line += `${FG_MAGENTA}${cell.item.char}`;
-      } else if (cell.tile === WALL) {
-        line += `${FG_WALL_GREY}\u2588`;
-      } else if (cell.tile === STAIR) {
-        line += `${FG_CYAN}>`;
-      } else if (cell.tile === FLOOR) {
-        line += `${FG_DARK_GREEN}\u00b7`;
+      if (c.isPlayer) {
+        line += cell(`${BG_YELLOW}${FG_BLACK}`, GLYPHS.player) + `${RESET}${BG_BLACK}`;
+      } else if (c.monster) {
+        const monsterGlyph = GLYPHS[c.monster.type] || { char: c.monster.char, wide: false };
+        if (monsterGlyph.wide) {
+          // Emoji renders in native colors, no ANSI override
+          line += cell('', monsterGlyph);
+        } else {
+          const color = MONSTER_COLORS[c.monster.type] || FG_WHITE;
+          line += cell(color, monsterGlyph);
+        }
+      } else if (c.item) {
+        const itemGlyph = GLYPHS[c.item.type] || { char: c.item.char, wide: false };
+        if (itemGlyph.wide) {
+          line += cell('', itemGlyph);
+        } else {
+          line += cell(FG_MAGENTA, itemGlyph);
+        }
+      } else if (c.tile === WALL) {
+        line += cell(FG_WALL_GREY, GLYPHS.wall);
+      } else if (c.tile === STAIR) {
+        line += cell(FG_CYAN, GLYPHS.stair);
+      } else if (c.tile === FLOOR) {
+        line += cell(FG_DARK_GREEN, GLYPHS.floor);
       } else {
-        line += ' ';
+        line += '  ';
       }
     }
     out += line + RESET + '\n';
