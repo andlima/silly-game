@@ -227,6 +227,25 @@ function render() {
   process.stdout.write(out);
 }
 
+let helpVisible = false;
+
+function renderHelp() {
+  let out = CLEAR + BG_BLACK;
+  out += `\n${FG_YELLOW}  === Controls ===${RESET}\n\n`;
+  out += `  ${FG_WHITE}Movement${RESET}\n`;
+  out += `    ${FG_CYAN}Arrow keys / WASD${RESET}  ${FG_GREY}Move${RESET}\n\n`;
+  out += `  ${FG_WHITE}Actions${RESET}\n`;
+  out += `    ${FG_CYAN}P${RESET}                  ${FG_GREY}Use potion${RESET}\n`;
+  out += `    ${FG_CYAN}. or >${RESET}              ${FG_GREY}Descend stairs${RESET}\n`;
+  out += `    ${FG_CYAN}5${RESET}                  ${FG_GREY}Wait a turn${RESET}\n\n`;
+  out += `  ${FG_WHITE}Toggles${RESET}\n`;
+  out += `    ${FG_CYAN}Tab${RESET}                ${FG_GREY}Toggle render mode${RESET}\n`;
+  out += `    ${FG_CYAN}R${RESET}                  ${FG_GREY}Restart game${RESET}\n`;
+  out += `    ${FG_CYAN}Q${RESET}                  ${FG_GREY}Quit${RESET}\n\n`;
+  out += `  ${FG_GREY}Press any key to return to game${RESET}\n`;
+  process.stdout.write(out);
+}
+
 function renderGameOver() {
   let out = CLEAR + BG_BLACK;
   out += `\n\n${FG_RED}  *** GAME OVER ***${RESET}\n\n`;
@@ -262,6 +281,20 @@ process.stdout.write(HIDE_CURSOR);
 process.stdin.on('data', (key) => {
   if (key === 'q' || key === 'Q' || key === '\x03') {
     cleanup();
+    return;
+  }
+
+  // Help overlay: any key dismisses it
+  if (helpVisible) {
+    helpVisible = false;
+    render();
+    return;
+  }
+
+  // Show help
+  if (key === '?' || key === 'h' || key === 'H') {
+    helpVisible = true;
+    renderHelp();
     return;
   }
 
