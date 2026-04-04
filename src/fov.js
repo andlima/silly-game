@@ -4,7 +4,7 @@ const TORCH_RADIUS = 8;
 
 /**
  * Compute field of view using recursive shadowcasting.
- * Returns a Map of "x,y" -> brightness (0.3–1.0) for all visible tiles.
+ * Returns a Map of "x,y" -> brightness (0.45–1.0) for all visible tiles.
  */
 export function computeFOV(map, ox, oy, radius = TORCH_RADIUS) {
   const visible = new Map();
@@ -20,8 +20,8 @@ export function computeFOV(map, ox, oy, radius = TORCH_RADIUS) {
 }
 
 function brightness(distance, radius) {
-  const b = 1.0 - (distance / radius) * 0.7;
-  return Math.max(0.3, Math.min(1.0, b));
+  const b = 1.0 - (distance / radius) * 0.55;
+  return Math.max(0.45, Math.min(1.0, b));
 }
 
 function isOpaque(map, x, y) {
