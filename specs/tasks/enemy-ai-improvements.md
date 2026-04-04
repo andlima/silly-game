@@ -4,7 +4,7 @@ status: not-started
 area: gameplay
 priority: 70
 depends_on: []
-description: Improve enemy movement and awareness — cardinal-only movement, reduced/per-type awareness radius, and line-of-sight gating
+description: Improve enemy movement and awareness — cardinal-only movement, reduced/per-type awareness radius, line-of-sight gating, and attack stagger
 ---
 
 # Enemy AI Improvements
@@ -114,6 +114,31 @@ dragons dominate (6). The `awareness` field is propagated to monster instances
 during `spawnMonsters()` — it already spreads `...MONSTER_TYPES[type]` so no
 spawn code changes are needed.
 
+### 5. Attack stagger
+
+**Where:** `runMonsterTurns()` (lines 398-410)
+
+After a monster attacks the player, mark it as staggered. On its next turn,
+a staggered monster skips its action (no attack, no movement) and clears the
+flag. This gives the player a 1-turn breathing window after each hit, rewarding
+tactical positioning and making combat less punishing.
+
+**Implementation:** Add a `staggered` boolean to monster state.
+
+```js
+// At the top of the monster loop, check and clear stagger:
+if (m.staggered) {
+  updatedMonsters[i] = { ...m, staggered: false };
+  continue;
+}
+
+// After the attack block (dist === 1), set stagger:
+updatedMonsters[i] = { ...m, staggered: true };
+```
+
+The `staggered` field does not need to be added to `MONSTER_TYPES` — it
+defaults to `undefined` (falsy) on spawn, which is correct.
+
 ## Test Updates
 
 Update existing tests in `src/game.test.js`:
@@ -136,6 +161,10 @@ Update existing tests in `src/game.test.js`:
 5. **Add new test: "per-type awareness radius"** — verify a rat idles at
    distance 4 while a dragon chases at distance 6.
 
+6. **Add new test: "monster staggers after attacking"** — place an adjacent
+   monster, wait two turns: first turn it attacks, second turn it skips
+   (player HP unchanged on second turn), third turn it attacks again.
+
 ## Out of Scope
 
 - Changing player movement (already cardinal-only)
@@ -153,4 +182,5 @@ Update existing tests in `src/game.test.js`:
   - Enemies don't react until the player is close
   - Enemies behind walls stay idle until the player rounds the corner
   - Rats are easy to sneak past; dragons detect from further away
+  - After hitting the player, enemies pause for one turn before acting again
 - Run `node --test src/game.test.js` — all tests pass
