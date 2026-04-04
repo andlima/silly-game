@@ -191,6 +191,20 @@
 
     @media (pointer: coarse) {
       #action-bar { display: flex; }
+      #hud {
+        position: fixed;
+        bottom: 60px;
+        left: 0;
+        right: 0;
+        justify-content: center;
+        border-top: none;
+        border-bottom: 1px solid #222;
+        background: #0a0a0a;
+        z-index: 5;
+      }
+      /* Hide mute/help in HUD on mobile — they move to action bar */
+      #hud > #mute-btn,
+      #hud > #help-btn { display: none; }
     }
 
     @media (max-width: 600px) {
@@ -231,7 +245,7 @@
       <div class="help-row"><span class="help-key">N</span><span class="help-desc">Toggle sound</span></div>
       <div class="help-row"><span class="help-key">R</span><span class="help-desc">Restart game</span></div>
       <h3>Touch Controls</h3>
-      <div class="help-row"><span class="help-key">Swipe</span><span class="help-desc">Move</span></div>
+      <div class="help-row"><span class="help-key">Tap quadrant</span><span class="help-desc">Move</span></div>
       <div class="help-row"><span class="help-key">Action buttons</span><span class="help-desc">Potion / Descend / Wait</span></div>
       <div class="help-dismiss">Press ? or Esc to close</div>
     </div>
@@ -250,8 +264,8 @@
     import { GLYPHS, GLYPHS_ENHANCED, GLYPHS_ASCII, getRenderMode, toggleRenderMode } from './src/glyphs.js';
     import { initAudio, setVolume, getVolume, playMove, playAttack, playHurt, playPickup, playDescend, playDeath, playVictory } from './src/audio.js';
 
-    const TILE_SIZE = 56;
-    const FONT_SIZE = 44;
+    const TILE_SIZE = 45;
+    const FONT_SIZE = 35;
     const EMOJI_FONT = '"Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", monospace';
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
@@ -265,6 +279,7 @@
     let game = createGame();
     let minimapVisible = window.innerWidth >= 600;
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    let tapFeedback = null; // { dir, startTime } for visual tap feedback
     let helpVisible = false;
     const helpOverlay = document.getElementById('help-overlay');
     const helpBtn = document.getElementById('help-btn');
@@ -396,11 +411,22 @@
       d: 'e', D: 'e',
     };
 
+    const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+
     function getViewSize() {
       const actionBar = document.getElementById('action-bar');
       const actionBarH = actionBar && actionBar.offsetHeight > 0 ? actionBar.offsetHeight : 0;
+      const hudH = hud.offsetHeight || 0;
       const cols = Math.floor((window.innerWidth - 40) / TILE_SIZE);
-      const rows = Math.floor((window.innerHeight - 160 - actionBarH) / TILE_SIZE);
+      let overhead;
+      if (isCoarsePointer) {
+        // Mobile: HUD and action bar are fixed at the bottom; top has minimal padding
+        overhead = 40 + hudH + actionBarH;
+      } else {
+        // Desktop: HUD is at top with messages below
+        overhead = 160 + actionBarH;
+      }
+      const rows = Math.floor((window.innerHeight - overhead) / TILE_SIZE);
       return { cols: Math.max(10, cols), rows: Math.max(6, rows) };
     }
 
@@ -657,6 +683,29 @@
         }
       }
 
+      // Tap-quadrant feedback overlay
+      if (tapFeedback) {
+        const w = canvas.width;
+        const h = canvas.height;
+        const hw = w / 2;
+        const hh = h / 2;
+        ctx.save();
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        if (tapFeedback.dir === 'n') {
+          ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(hw, hh); ctx.closePath();
+        } else if (tapFeedback.dir === 's') {
+          ctx.moveTo(0, h); ctx.lineTo(w, h); ctx.lineTo(hw, hh); ctx.closePath();
+        } else if (tapFeedback.dir === 'w') {
+          ctx.moveTo(0, 0); ctx.lineTo(0, h); ctx.lineTo(hw, hh); ctx.closePath();
+        } else {
+          ctx.moveTo(w, 0); ctx.lineTo(w, h); ctx.lineTo(hw, hh); ctx.closePath();
+        }
+        ctx.fill();
+        ctx.restore();
+      }
+
       // HUD: HP bar
       const hp = game.player.hp;
       const maxHp = game.player.maxHp;
@@ -840,7 +889,26 @@
       }
     });
 
-    // --- Touch / swipe controls ---
+    // --- Mobile: relocate mute/help buttons into action bar ---
+    if (isCoarsePointer) {
+      const actionBar = document.getElementById('action-bar');
+      actionBar.appendChild(muteBtn);
+      actionBar.appendChild(helpBtn);
+      // Style them consistently with action bar buttons
+      for (const btn of [muteBtn, helpBtn]) {
+        btn.style.minWidth = '44px';
+        btn.style.minHeight = '44px';
+        btn.style.padding = '8px 14px';
+        btn.style.background = '#222';
+        btn.style.color = '#ccc';
+        btn.style.border = '1px solid #444';
+        btn.style.borderRadius = '4px';
+        btn.style.touchAction = 'manipulation';
+        btn.style.display = '';
+      }
+    }
+
+    // --- Touch tap-quadrant controls ---
     let touchStartX = 0;
     let touchStartY = 0;
 
@@ -856,17 +924,27 @@
       e.preventDefault();
       if (game.gameOver || game.won) return;
       const touch = e.changedTouches[0];
-      const dx = touch.clientX - touchStartX;
-      const dy = touch.clientY - touchStartY;
-      const absDx = Math.abs(dx);
-      const absDy = Math.abs(dy);
-      const threshold = 30;
-      if (absDx < threshold && absDy < threshold) return; // tap, ignore
-      if (absDx > absDy) {
-        dispatchAndPlay({ type: 'move', dir: dx > 0 ? 'e' : 'w' });
+      const moveX = touch.clientX - touchStartX;
+      const moveY = touch.clientY - touchStartY;
+      // Only process taps (not drags/scrolls)
+      if (Math.abs(moveX) > 15 || Math.abs(moveY) > 15) return;
+      // Compute position relative to canvas center
+      const rect = canvas.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = touch.clientX - cx;
+      const dy = touch.clientY - cy;
+      let dir;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        dir = dy < 0 ? 'n' : 's';
       } else {
-        dispatchAndPlay({ type: 'move', dir: dy > 0 ? 's' : 'n' });
+        dir = dx > 0 ? 'e' : 'w';
       }
+      // Visual tap feedback
+      tapFeedback = { dir, startTime: performance.now() };
+      render();
+      setTimeout(() => { tapFeedback = null; render(); }, 150);
+      dispatchAndPlay({ type: 'move', dir });
     }, { passive: false });
 
     // --- Action bar buttons ---
