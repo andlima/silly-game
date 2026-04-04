@@ -974,6 +974,7 @@
 
     canvas.addEventListener('touchend', (e) => {
       e.preventDefault();
+      if (!audioReady) { initAudio(); audioReady = true; }
       if (game.gameOver || game.won) return;
       const touch = e.changedTouches[0];
       const moveX = touch.clientX - touchStartX;

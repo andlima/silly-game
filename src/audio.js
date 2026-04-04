@@ -13,6 +13,7 @@ export function initAudio() {
     return ctx;
   }
   ctx = new (window.AudioContext || window.webkitAudioContext)();
+  ctx.resume();
   masterGain = ctx.createGain();
   masterGain.gain.value = volume;
   masterGain.connect(ctx.destination);
