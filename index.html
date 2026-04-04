@@ -2,10 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1">
   <title>Silly Roguelike</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      overflow: hidden;
+    }
     body {
       background: #0a0a0a;
       color: #aaa;
@@ -15,7 +18,7 @@
       align-items: center;
       padding-top: 20px;
     }
-    canvas { display: block; image-rendering: pixelated; }
+    canvas { display: block; image-rendering: pixelated; touch-action: none; }
     #hud {
       margin-top: 8px;
       font-size: 16px;
@@ -91,6 +94,35 @@
     }
     #overlay button:hover { background: #555; }
 
+    /* Mobile action bar — hidden by default, shown on touch devices */
+    #action-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      justify-content: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: #111;
+      border-top: 1px solid #333;
+      z-index: 5;
+    }
+    #action-bar button {
+      font-family: monospace;
+      font-size: 16px;
+      min-width: 80px;
+      min-height: 44px;
+      padding: 8px 14px;
+      background: #222;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 4px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    #action-bar button:active { background: #444; }
+
     /* Help overlay */
     #help-overlay {
       display: none;
@@ -156,6 +188,16 @@
       pointer-events: none;
     }
     #help-hint.visible { display: block; }
+
+    @media (pointer: coarse) {
+      #action-bar { display: flex; }
+    }
+
+    @media (max-width: 600px) {
+      #hud { font-size: 13px; gap: 8px; padding: 4px 8px; }
+      #hud .equipment { font-size: 11px; }
+      #hp-bar-container { width: 100px; }
+    }
   </style>
 </head>
 <body>
@@ -188,8 +230,16 @@
       <div class="help-row"><span class="help-key">M</span><span class="help-desc">Toggle minimap</span></div>
       <div class="help-row"><span class="help-key">N</span><span class="help-desc">Toggle sound</span></div>
       <div class="help-row"><span class="help-key">R</span><span class="help-desc">Restart game</span></div>
+      <h3>Touch Controls</h3>
+      <div class="help-row"><span class="help-key">Swipe</span><span class="help-desc">Move</span></div>
+      <div class="help-row"><span class="help-key">Action buttons</span><span class="help-desc">Potion / Descend / Wait</span></div>
       <div class="help-dismiss">Press ? or Esc to close</div>
     </div>
+  </div>
+  <div id="action-bar">
+    <button id="btn-potion">Potion</button>
+    <button id="btn-descend">Descend</button>
+    <button id="btn-wait">Wait</button>
   </div>
   <div id="overlay">
     <h1 id="overlay-title">Game Over</h1>
@@ -197,11 +247,11 @@
   </div>
   <script type="module">
     import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR, EQUIPMENT_TYPES } from './src/game.js';
-    import { GLYPHS, toggleRenderMode, getRenderMode } from './src/glyphs.js';
+    import { GLYPHS, GLYPHS_ENHANCED, GLYPHS_ASCII, getRenderMode, toggleRenderMode } from './src/glyphs.js';
     import { initAudio, setVolume, getVolume, playMove, playAttack, playHurt, playPickup, playDescend, playDeath, playVictory } from './src/audio.js';
 
-    const TILE_SIZE = 28;
-    const FONT_SIZE = 22;
+    const TILE_SIZE = 56;
+    const FONT_SIZE = 44;
     const EMOJI_FONT = '"Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", monospace';
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
@@ -212,8 +262,17 @@
     const restartBtn = document.getElementById('restart-btn');
     const modeEl = document.getElementById('hud-mode');
 
+    // Cached HUD DOM references (perf: avoid getElementById per frame)
+    const hpFillEl = document.getElementById('hp-bar-fill');
+    const hpTextEl = document.getElementById('hp-bar-text');
+    const hudLevelEl = document.getElementById('hud-level');
+    const hudPotionsEl = document.getElementById('hud-potions');
+    const hudEquipmentEl = document.getElementById('hud-equipment');
+    const actionBarEl = document.getElementById('action-bar');
+
     let game = createGame();
-    let minimapVisible = true;
+    let minimapVisible = window.innerWidth >= 600;
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     let helpVisible = false;
     const helpOverlay = document.getElementById('help-overlay');
     const helpBtn = document.getElementById('help-btn');
@@ -224,10 +283,8 @@
       helpOverlay.classList.toggle('visible', helpVisible);
     }
 
-    // Help button click
     helpBtn.addEventListener('click', toggleHelp);
 
-    // Dismiss help when clicking backdrop (outside help-content)
     helpOverlay.addEventListener('click', (e) => {
       if (e.target === helpOverlay) {
         helpVisible = false;
@@ -249,7 +306,66 @@
       document.addEventListener('touchstart', dismissHint);
     }
 
-    // Refined color palette
+    // --- Render mode: emoji / sprite / ascii ---
+    // We manage our own 3-mode cycle independent of glyphs.js's 2-mode toggle.
+    let renderMode = 'emoji'; // 'emoji' | 'sprite' | 'ascii'
+
+    function cycleRenderMode() {
+      if (renderMode === 'emoji') {
+        renderMode = 'sprite';
+        // Reset glyphs.js to enhanced (default) for any text fallback needs
+        if (getRenderMode() !== 'enhanced') toggleRenderMode();
+      } else if (renderMode === 'sprite') {
+        renderMode = 'ascii';
+        // Switch glyphs.js to ascii mode
+        if (getRenderMode() !== 'ascii') toggleRenderMode();
+      } else {
+        renderMode = 'emoji';
+        // Ensure glyphs.js is in enhanced mode
+        if (getRenderMode() !== 'enhanced') toggleRenderMode();
+      }
+    }
+
+    // --- Sprite sheet ---
+    const spriteSheet = new Image();
+    spriteSheet.src = 'assets/roguelike-sprites.png';
+    let spriteReady = false;
+    let cellW = 0, cellH = 0;
+
+    spriteSheet.onload = () => {
+      cellW = spriteSheet.width / 4;
+      cellH = spriteSheet.height / 3;
+      spriteReady = true;
+      render();
+    };
+
+    // Sprite coordinate map: name -> { col, row }
+    const SPRITE_MAP = {
+      player:   { col: 0, row: 0 },
+      potion:   { col: 1, row: 0 },
+      rat:      { col: 2, row: 0 },
+      skeleton: { col: 3, row: 0 },
+      wall:     { col: 0, row: 1 },
+      bear:     { col: 1, row: 1 },
+      dragon:   { col: 2, row: 1 },
+      stair:    { col: 3, row: 1 },
+      dagger:   { col: 0, row: 2 },
+      sword:    { col: 1, row: 2 },
+      helmet:   { col: 2, row: 2 },
+      shield:   { col: 3, row: 2 },
+    };
+
+    function drawSprite(name, px, py) {
+      const s = SPRITE_MAP[name];
+      if (!s || !spriteReady) return;
+      ctx.drawImage(
+        spriteSheet,
+        s.col * cellW, s.row * cellH, cellW, cellH,
+        px, py, TILE_SIZE, TILE_SIZE
+      );
+    }
+
+    // --- Color helpers ---
     const WALL_SHADES = ['#3a3a4a', '#40405a', '#4a4a5a'];
     const FLOOR_SHADES = ['#1a1a1a', '#1c1c1c', '#1e1e1e'];
 
@@ -274,8 +390,9 @@
     };
 
     function getViewSize() {
+      const actionBarH = actionBarEl && actionBarEl.offsetHeight > 0 ? actionBarEl.offsetHeight : 0;
       const cols = Math.floor((window.innerWidth - 40) / TILE_SIZE);
-      const rows = Math.floor((window.innerHeight - 160) / TILE_SIZE);
+      const rows = Math.floor((window.innerHeight - 160 - actionBarH) / TILE_SIZE);
       return { cols: Math.max(10, cols), rows: Math.max(6, rows) };
     }
 
@@ -305,16 +422,74 @@
       return FLOOR_SHADES[(x * 7 + y * 13) % 3];
     }
 
-    function render() {
-      const { cols, rows } = getViewSize();
-      canvas.width = cols * TILE_SIZE;
-      canvas.height = rows * TILE_SIZE;
+    // --- Rendering ---
 
-      const visible = getVisibleTiles(game, cols, rows);
+    function renderSpriteMode(visible) {
+      // Revealed pass: single save/restore for all revealed tiles
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      ctx.filter = 'grayscale(100%)';
+      for (let vy = 0; vy < visible.length; vy++) {
+        for (let vx = 0; vx < visible[vy].length; vx++) {
+          const cell = visible[vy][vx];
+          if (cell.visibility !== 'revealed') continue;
+          const px = vx * TILE_SIZE;
+          const py = vy * TILE_SIZE;
 
-      ctx.fillStyle = COLORS.bg;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+          if (cell.tile === WALL) {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            drawSprite('wall', px, py);
+          } else if (cell.tile === STAIR) {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            drawSprite('stair', px, py);
+          } else if (cell.tile === FLOOR) {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
+        }
+      }
+      ctx.restore();
 
+      // Visible pass: set globalAlpha directly per tile (no save/restore needed)
+      for (let vy = 0; vy < visible.length; vy++) {
+        for (let vx = 0; vx < visible[vy].length; vx++) {
+          const cell = visible[vy][vx];
+          if (cell.visibility !== 'visible') continue;
+          const px = vx * TILE_SIZE;
+          const py = vy * TILE_SIZE;
+          const mx = cell.x;
+          const my = cell.y;
+          const b = cell.brightness;
+
+          // Floor background for all walkable tiles
+          if (cell.tile === FLOOR || cell.tile === STAIR) {
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = scaleColor(floorShade(mx, my), b);
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
+
+          ctx.globalAlpha = b;
+
+          if (cell.isPlayer) {
+            drawSprite('player', px, py);
+          } else if (cell.monster) {
+            drawSprite(cell.monster.type, px, py);
+          } else if (cell.item) {
+            drawSprite(cell.item.type, px, py);
+          } else if (cell.tile === WALL) {
+            drawSprite('wall', px, py);
+          } else if (cell.tile === STAIR) {
+            drawSprite('stair', px, py);
+          }
+        }
+      }
+      // Reset globalAlpha
+      ctx.globalAlpha = 1;
+    }
+
+    function renderTextMode(visible) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
@@ -345,10 +520,8 @@
             continue;
           }
 
-          // Visible tiles — apply brightness scaling
           const b = cell.brightness;
 
-          // Draw floor background for all visible floor tiles
           if (cell.tile === FLOOR || cell.tile === STAIR) {
             ctx.fillStyle = scaleColor(floorShade(mx, my), b);
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
@@ -390,6 +563,23 @@
           }
         }
       }
+    }
+
+    function render() {
+      const { cols, rows } = getViewSize();
+      canvas.width = cols * TILE_SIZE;
+      canvas.height = rows * TILE_SIZE;
+
+      const visible = getVisibleTiles(game, cols, rows);
+
+      ctx.fillStyle = COLORS.bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (renderMode === 'sprite') {
+        renderSpriteMode(visible);
+      } else {
+        renderTextMode(visible);
+      }
 
       // Minimap overlay
       if (minimapVisible) {
@@ -403,11 +593,16 @@
         const mmX = canvas.width - scaledW - margin - border * 2;
         const mmY = margin;
 
-        // Dark background with border
         ctx.fillStyle = '#111';
         ctx.fillRect(mmX - border, mmY - border, scaledW + border * 2, scaledH + border * 2);
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(mmX, mmY, scaledW, scaledH);
+
+        // Pre-compute monster positions for O(1) lookups
+        const monsterPositions = new Set();
+        for (const m of game.monsters) {
+          monsterPositions.add(`${m.x},${m.y}`);
+        }
 
         for (let y = 0; y < mapH; y++) {
           for (let x = 0; x < mapW; x++) {
@@ -416,10 +611,9 @@
             const inFOV = game.fov.has(`${x},${y}`);
             const tile = game.map.tiles[y][x];
 
-            // Check for player
             if (x === game.player.x && y === game.player.y) {
               ctx.fillStyle = '#ffcc00';
-            } else if (inFOV && game.monsters.some(m => m.x === x && m.y === y)) {
+            } else if (inFOV && monsterPositions.has(`${x},${y}`)) {
               ctx.fillStyle = '#cc3333';
             } else if (tile === STAIR) {
               ctx.fillStyle = '#5599dd';
@@ -438,35 +632,31 @@
       const hp = game.player.hp;
       const maxHp = game.player.maxHp;
       const pct = maxHp > 0 ? hp / maxHp : 0;
-      const hpFill = document.getElementById('hp-bar-fill');
-      const hpText = document.getElementById('hp-bar-text');
       let barColor;
       if (pct > 0.6) barColor = '#44aa44';
       else if (pct > 0.3) barColor = '#ccaa22';
       else barColor = '#cc3333';
-      hpFill.style.width = `${Math.round(pct * 100)}%`;
-      hpFill.style.background = barColor;
-      hpText.textContent = `${hp}/${maxHp}`;
+      hpFillEl.style.width = `${Math.round(pct * 100)}%`;
+      hpFillEl.style.background = barColor;
+      hpTextEl.textContent = `${hp}/${maxHp}`;
 
-      document.getElementById('hud-level').textContent = `Level: ${game.level}`;
-      document.getElementById('hud-potions').textContent = `Potions: ${game.inventory.potions}`;
+      hudLevelEl.textContent = `Level: ${game.level}`;
+      hudPotionsEl.textContent = `Potions: ${game.inventory.potions}`;
 
-      // Equipment HUD
       const eq = game.equipment;
-      const eqParts = [];
       const weaponStr = eq.weapon ? `${eq.weapon.name} +${eq.weapon.bonus}atk` : '\u2014';
       const helmetStr = eq.helmet ? `${eq.helmet.name} +${eq.helmet.bonus}def` : '\u2014';
       const shieldStr = eq.shield ? `${eq.shield.name} +${eq.shield.bonus}def` : '\u2014';
-      document.getElementById('hud-equipment').textContent =
+      hudEquipmentEl.textContent =
         `Weapon: ${weaponStr} | Helmet: ${helmetStr} | Shield: ${shieldStr}`;
 
-      modeEl.textContent = getRenderMode() === 'enhanced' ? '[emoji]' : '[ASCII]';
+      const modeLabels = { sprite: '[sprite]', emoji: '[emoji]', ascii: '[ASCII]' };
+      modeEl.textContent = modeLabels[renderMode];
 
       // Messages with transparency fade
       const msgs = game.messages;
       let msgHtml = '';
       for (let i = 0; i < msgs.length; i++) {
-        // newest message is last in array
         const age = msgs.length - 1 - i;
         const opacity = Math.max(0.4, 1.0 - age * 0.15);
         msgHtml += `<div class="msg-line" style="opacity:${opacity}">${msgs[i]}</div>`;
@@ -494,7 +684,6 @@
       if (newGame.gameOver && !oldGame.gameOver) { playDeath(); return; }
       if (newGame.level > oldGame.level) { playDescend(); return; }
       if (newGame.player.hp < oldGame.player.hp) playHurt();
-      // Check if a monster lost HP (player attacked)
       if (newGame.level === oldGame.level) {
         const oldMonsters = new Map(oldGame.monsters.map(m => [m.id !== undefined ? m.id : `${m.x},${m.y}`, m]));
         for (const nm of newGame.monsters) {
@@ -502,7 +691,6 @@
           const om = oldMonsters.get(key);
           if (om && nm.hp < om.hp) { playAttack(); break; }
         }
-        // Monster killed (fewer monsters) also counts as attack
         if (newGame.monsters.length < oldGame.monsters.length) playAttack();
       }
       if (newGame.inventory.potions > oldGame.inventory.potions ||
@@ -544,7 +732,7 @@
       // Tab toggles render mode even during game over/win
       if (e.key === 'Tab') {
         e.preventDefault();
-        toggleRenderMode();
+        cycleRenderMode();
         render();
         return;
       }
@@ -619,6 +807,52 @@
         setVolume(savedVolume);
         muteBtn.textContent = '\u{1f50a}';
       }
+    });
+
+    // --- Touch / swipe controls ---
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (!audioReady) { initAudio(); audioReady = true; }
+      const touch = e.changedTouches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (game.gameOver || game.won) return;
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+      const threshold = 30;
+      if (absDx < threshold && absDy < threshold) return; // tap, ignore
+      if (absDx > absDy) {
+        dispatchAndPlay({ type: 'move', dir: dx > 0 ? 'e' : 'w' });
+      } else {
+        dispatchAndPlay({ type: 'move', dir: dy > 0 ? 's' : 'n' });
+      }
+    }, { passive: false });
+
+    // --- Action bar buttons ---
+    document.getElementById('btn-potion').addEventListener('click', () => {
+      if (!audioReady) { initAudio(); audioReady = true; }
+      if (game.gameOver || game.won) return;
+      dispatchAndPlay({ type: 'usePotion' });
+    });
+    document.getElementById('btn-descend').addEventListener('click', () => {
+      if (!audioReady) { initAudio(); audioReady = true; }
+      if (game.gameOver || game.won) return;
+      dispatchAndPlay({ type: 'descend' });
+    });
+    document.getElementById('btn-wait').addEventListener('click', () => {
+      if (!audioReady) { initAudio(); audioReady = true; }
+      if (game.gameOver || game.won) return;
+      dispatchAndPlay({ type: 'wait' });
     });
 
     restartBtn.addEventListener('click', () => {

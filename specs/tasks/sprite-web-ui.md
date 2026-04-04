@@ -1,13 +1,17 @@
 ---
 id: sprite-web-ui
-status: not-started
+status: superseded
 area: web
 priority: 50
 depends_on: []
 description: New canvas-based web UI using sprite sheet images instead of text/emoji rendering
+superseded_by: consolidate-html
 ---
 
 # Sprite-Based Web UI
+
+> **Superseded by `consolidate-html`.** `sprite.html` has been merged into
+> `index.html` as a single entry point with sprite, emoji, and ASCII modes.
 
 ## Goal
 

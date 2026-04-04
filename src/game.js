@@ -454,7 +454,8 @@ export function getVisibleTiles(game, viewW, viewH) {
       const my = camY + vy;
       const inBounds = mx >= 0 && mx < map.width && my >= 0 && my < map.height;
       const key = `${mx},${my}`;
-      const isVisible = fov && fov.has(key);
+      const bright = fov ? (fov.get(key) ?? 0) : 0;
+      const isVisible = bright > 0;
       const isRevealed = inBounds && revealed && revealed[my][mx];
 
       let visibility;
@@ -466,7 +467,6 @@ export function getVisibleTiles(game, viewW, viewH) {
       // Only show monsters and items in visible cells
       const monster = visibility === 'visible' ? (monsterAt[key] || null) : null;
       const item = visibility === 'visible' ? (itemAt[key] || null) : null;
-      const bright = isVisible ? fov.get(key) : 0;
 
       row.push({
         tile,

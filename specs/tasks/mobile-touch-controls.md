@@ -4,14 +4,14 @@ status: not-started
 area: web
 priority: 50
 depends_on: [sprite-web-ui]
-description: Add touch controls to sprite.html so the game is playable on mobile phones
+description: Add touch controls to index.html so the game is playable on mobile phones
 ---
 
 # Mobile Touch Controls
 
 ## Goal
 
-Make `sprite.html` playable on mobile phones by adding touch-based input
+Make `index.html` playable on mobile phones by adding touch-based input
 (swipe gestures for movement, action buttons for other commands) and
 preventing common mobile annoyances (accidental zoom, scroll bounce).
 
@@ -74,7 +74,7 @@ preventing common mobile annoyances (accidental zoom, scroll bounce).
 
 ## Files to Modify
 
-- `sprite.html` — all changes are in this file (touch handlers, action bar
+- `index.html` — all changes are in this file (touch handlers, action bar
   HTML/CSS, responsive tweaks).
 
 ## Files NOT to Modify
