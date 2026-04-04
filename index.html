@@ -80,9 +80,36 @@
       z-index: 10;
     }
     #overlay.visible { display: flex; }
-    #overlay h1 { font-size: 48px; margin-bottom: 20px; }
+    #overlay h1 { font-size: 48px; margin-bottom: 8px; }
     #overlay h1.game-over { color: #ff4444; }
     #overlay h1.win { color: #44ff44; }
+    #overlay .epitaph {
+      font-size: 16px;
+      font-style: italic;
+      color: #ccaa44;
+      margin-bottom: 20px;
+    }
+    #overlay .stats-panel {
+      font-family: monospace;
+      max-width: 300px;
+      width: 90%;
+      margin-bottom: 24px;
+    }
+    #overlay .stats-header {
+      color: #888;
+      font-size: 13px;
+      text-align: center;
+      margin-bottom: 8px;
+      letter-spacing: 2px;
+    }
+    #overlay .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      font-size: 14px;
+    }
+    #overlay .stat-label { color: #aaa; }
+    #overlay .stat-value { color: #fff; }
     #overlay button {
       font-family: monospace;
       font-size: 20px;
@@ -258,6 +285,8 @@
   </div>
   <div id="overlay">
     <h1 id="overlay-title">Game Over</h1>
+    <div class="epitaph" id="overlay-epitaph"></div>
+    <div class="stats-panel" id="overlay-stats"></div>
     <button id="restart-btn">Restart</button>
   </div>
   <script type="module">
@@ -720,13 +749,32 @@
       }
       messagesEl.innerHTML = msgHtml;
 
-      if (game.gameOver) {
-        overlayTitle.textContent = 'Game Over';
-        overlayTitle.className = 'game-over';
-        overlayEl.classList.add('visible');
-      } else if (game.won) {
-        overlayTitle.textContent = 'You Win!';
-        overlayTitle.className = 'win';
+      if (game.gameOver || game.won) {
+        const epitaphEl = document.getElementById('overlay-epitaph');
+        const statsEl = document.getElementById('overlay-stats');
+        if (game.gameOver) {
+          overlayTitle.textContent = '\u{1F480} Game Over';
+          overlayTitle.className = 'game-over';
+          const killer = game.stats.causeOfDeath || 'dungeon';
+          epitaphEl.textContent = `Slain by a ${killer} on level ${game.level}`;
+        } else {
+          overlayTitle.textContent = '\u{1F3C6} You Win!';
+          overlayTitle.className = 'win';
+          epitaphEl.textContent = `Escaped the dungeon on level ${game.level}`;
+        }
+        const s = game.stats;
+        const rows = [
+          ['Level reached', game.level],
+          ['Monsters slain', s.monstersKilled],
+          ['Damage dealt', s.damageDealt],
+          ['Damage taken', s.damageTaken],
+          ['Potions used', s.potionsUsed],
+          ['Steps taken', s.stepsTaken],
+        ];
+        statsEl.innerHTML = '<div class="stats-header">\u2500\u2500 Stats \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500</div>' +
+          rows.map(([label, val]) =>
+            `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-value">${val}</span></div>`
+          ).join('');
         overlayEl.classList.add('visible');
       } else {
         overlayEl.classList.remove('visible');

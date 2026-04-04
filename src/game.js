@@ -32,6 +32,15 @@ const MAX_MESSAGES = 5;
 const WIN_LEVEL = 5;
 const POTION_HEAL = 10;
 
+const DEFAULT_STATS = {
+  monstersKilled: 0, damageDealt: 0, damageTaken: 0,
+  potionsUsed: 0, stepsTaken: 0, causeOfDeath: null,
+};
+
+function getStats(game) {
+  return game.stats || { ...DEFAULT_STATS };
+}
+
 export function createGame() {
   return newLevel({
     player: { ...PLAYER_STATS },
@@ -41,6 +50,14 @@ export function createGame() {
     messages: [],
     gameOver: false,
     won: false,
+    stats: {
+      monstersKilled: 0,
+      damageDealt: 0,
+      damageTaken: 0,
+      potionsUsed: 0,
+      stepsTaken: 0,
+      causeOfDeath: null,
+    },
   });
 }
 
@@ -75,6 +92,10 @@ function newLevel(state) {
     won: false,
     revealed,
     fov,
+    stats: state.stats ? { ...state.stats } : {
+      monstersKilled: 0, damageDealt: 0, damageTaken: 0,
+      potionsUsed: 0, stepsTaken: 0, causeOfDeath: null,
+    },
   };
 }
 
@@ -234,6 +255,7 @@ function handleMove(game, dir) {
   let moved = {
     ...game,
     player: { ...game.player, x: nx, y: ny },
+    stats: { ...getStats(game), stepsTaken: getStats(game).stepsTaken + 1 },
   };
 
   // Auto-pickup items at new position
@@ -302,6 +324,7 @@ function handleDescend(game) {
     messages: messages.slice(-MAX_MESSAGES),
     gameOver: false,
     won: false,
+    stats: { ...game.stats },
   });
 }
 
@@ -323,6 +346,7 @@ function handleUsePotion(game) {
     player: { ...game.player, hp: newHp },
     inventory: { ...game.inventory, potions: game.inventory.potions - 1 },
     messages: messages.slice(-MAX_MESSAGES),
+    stats: { ...getStats(game), potionsUsed: getStats(game).potionsUsed + 1 },
   };
 }
 
@@ -342,16 +366,18 @@ function playerAttack(game, target) {
   messages.push(`You hit the ${target.name} for ${damage} damage.`);
 
   let monsters;
+  let stats = { ...getStats(game), damageDealt: getStats(game).damageDealt + damage };
   if (newHp <= 0) {
     messages.push(`The ${target.name} is defeated!`);
     monsters = game.monsters.filter(m => m !== target);
+    stats = { ...stats, monstersKilled: stats.monstersKilled + 1 };
   } else {
     monsters = game.monsters.map(m =>
       m === target ? { ...m, hp: newHp } : m
     );
   }
 
-  const updated = { ...game, monsters, messages: messages.slice(-MAX_MESSAGES) };
+  const updated = { ...game, monsters, messages: messages.slice(-MAX_MESSAGES), stats };
   return runMonsterTurns(updated);
 }
 
@@ -361,6 +387,7 @@ function runMonsterTurns(game) {
   let updatedMonsters = [...monsters];
   let currentPlayer = { ...player };
   let dead = false;
+  let stats = getStats(game);
 
   for (let i = 0; i < updatedMonsters.length; i++) {
     const m = updatedMonsters[i];
@@ -373,9 +400,11 @@ function runMonsterTurns(game) {
       const defBonus = getEquipmentBonus(game.equipment, 'defense');
       const damage = Math.max(0, m.attack - (currentPlayer.defense + defBonus));
       currentPlayer = { ...currentPlayer, hp: currentPlayer.hp - damage };
+      stats = { ...stats, damageTaken: stats.damageTaken + damage };
       messages.push(`The ${m.name} hits you for ${damage} damage.`);
       if (currentPlayer.hp <= 0) {
         currentPlayer.hp = 0;
+        stats = { ...stats, causeOfDeath: m.name };
         dead = true;
         break;
       }
@@ -396,6 +425,7 @@ function runMonsterTurns(game) {
     monsters: updatedMonsters,
     messages: messages.slice(-MAX_MESSAGES),
     gameOver: dead,
+    stats,
   };
 }
 
