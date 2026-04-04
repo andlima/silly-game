@@ -350,6 +350,15 @@ function handleUsePotion(game) {
   };
 }
 
+let _rollOverride = null;
+
+export function setRollOverride(fn) { _rollOverride = fn; }
+
+function rollVariance() {
+  if (_rollOverride) return _rollOverride();
+  return Math.floor(Math.random() * 3) - 1;
+}
+
 function getEquipmentBonus(equipment, stat) {
   let bonus = 0;
   for (const slot of Object.values(equipment)) {
@@ -360,7 +369,8 @@ function getEquipmentBonus(equipment, stat) {
 
 function playerAttack(game, target) {
   const atkBonus = getEquipmentBonus(game.equipment, 'attack');
-  const damage = Math.max(0, game.player.attack + atkBonus - target.defense);
+  const base = game.player.attack + atkBonus - target.defense;
+  const damage = Math.max(0, base + rollVariance());
   const newHp = target.hp - damage;
   const messages = [...game.messages];
   messages.push(`You hit the ${target.name} for ${damage} damage.`);
@@ -404,7 +414,8 @@ function runMonsterTurns(game) {
     if (dist === 1) {
       // Adjacent: attack player
       const defBonus = getEquipmentBonus(game.equipment, 'defense');
-      const damage = Math.max(0, m.attack - (currentPlayer.defense + defBonus));
+      const base = m.attack - (currentPlayer.defense + defBonus);
+      const damage = Math.max(0, base + rollVariance());
       currentPlayer = { ...currentPlayer, hp: currentPlayer.hp - damage };
       stats = { ...stats, damageTaken: stats.damageTaken + damage };
       messages.push(`The ${m.name} hits you for ${damage} damage.`);
