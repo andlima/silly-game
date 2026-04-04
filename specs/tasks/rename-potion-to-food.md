@@ -17,7 +17,8 @@ to use "food" terminology so the name matches the visual.
 
 ## Changes
 
-This is a pure rename/refactor — no gameplay or logic changes.
+This is a rename/refactor with one small visual change (ASCII glyph).
+The `p` key binding is kept — no control changes.
 
 ### 1. `src/game.js` — core logic
 
@@ -29,6 +30,7 @@ This is a pure rename/refactor — no gameplay or logic changes.
 | `inventory.potions` field | `inventory.food` |
 | `stats.potionsUsed` field | `stats.foodUsed` |
 | `type: 'potion'` item type | `type: 'food'` |
+| Item `char: '!'` | `char: '%'` (roguelike convention for food) |
 | Action type `'usePotion'` | `'useFood'` |
 | Message `'You pick up a health potion.'` | `'You pick up some food.'` |
 | Message `'You have no potions.'` | `'You have no food.'` |
@@ -45,10 +47,12 @@ Update all references to match the new identifiers:
 - Describe block `'items and potions'` → `'items and food'`
 - Test names mentioning "potion" → use "food"
 - Message assertions (e.g., `'no potions'` → `'no food'`)
+- Item `char: '!'` → `char: '%'`
 
 ### 3. `src/glyphs.js` — glyph key
 
 - `potion:` key → `food:` (both emoji and ASCII objects)
+- ASCII char `'!'` → `'%'`
 
 ### 4. `index.html` — web UI
 
