@@ -769,4 +769,34 @@ describe('damage variance', () => {
     assert.equal(next.monsters[0].hp, 10); // no damage
     assert.ok(next.messages.some(m => m.includes('for 0 damage')));
   });
+
+  it('monster damage variance adds to base damage', () => {
+    setRollOverride(() => 1);
+    // monster attack=4, player defense=2 => base=2, +1 variance => 3
+    const monster = makeMonster({ x: 3, y: 2, attack: 4, defense: 100 });
+    const game = makeGame({ monsters: [monster] });
+    const next = dispatch(game, { type: 'wait' });
+    assert.equal(next.player.hp, 30 - 3); // 30 - 3 = 27
+    assert.ok(next.messages.some(m => m.includes('for 3 damage')));
+  });
+
+  it('monster damage variance subtracts from base damage', () => {
+    setRollOverride(() => -1);
+    // monster attack=4, player defense=2 => base=2, -1 variance => 1
+    const monster = makeMonster({ x: 3, y: 2, attack: 4, defense: 100 });
+    const game = makeGame({ monsters: [monster] });
+    const next = dispatch(game, { type: 'wait' });
+    assert.equal(next.player.hp, 30 - 1); // 30 - 1 = 29
+    assert.ok(next.messages.some(m => m.includes('for 1 damage')));
+  });
+
+  it('monster damage floor is zero with negative variance', () => {
+    setRollOverride(() => -1);
+    // monster attack=2, player defense=2 => base=0, -1 variance => Math.max(0, -1) = 0
+    const monster = makeMonster({ x: 3, y: 2, attack: 2, defense: 100 });
+    const game = makeGame({ monsters: [monster] });
+    const next = dispatch(game, { type: 'wait' });
+    assert.equal(next.player.hp, 30); // no damage
+    assert.ok(next.messages.some(m => m.includes('for 0 damage')));
+  });
 });
