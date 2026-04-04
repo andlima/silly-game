@@ -58,6 +58,11 @@ function makeGame(overrides = {}) {
     won: overrides.won || false,
     revealed,
     fov,
+    stats: {
+      monstersKilled: 0, damageDealt: 0, damageTaken: 0,
+      potionsUsed: 0, stepsTaken: 0, causeOfDeath: null,
+      ...overrides.stats,
+    },
   };
 }
 
@@ -454,6 +459,98 @@ describe('createGame structure', () => {
     for (const item of potions) {
       assert.equal(item.char, '!');
     }
+  });
+});
+
+describe('stats tracking', () => {
+  it('createGame returns a stats object with all counters at zero', () => {
+    const game = createGame();
+    assert.ok(game.stats, 'stats object should exist');
+    assert.equal(game.stats.monstersKilled, 0);
+    assert.equal(game.stats.damageDealt, 0);
+    assert.equal(game.stats.damageTaken, 0);
+    assert.equal(game.stats.potionsUsed, 0);
+    assert.equal(game.stats.stepsTaken, 0);
+    assert.equal(game.stats.causeOfDeath, null);
+  });
+
+  it('monstersKilled and damageDealt increment on kill', () => {
+    const monster = makeMonster({ x: 3, y: 2, hp: 5, defense: 0 });
+    const game = makeGame({ monsters: [monster] });
+    const next = dispatch(game, { type: 'move', dir: 'e' }); // player attack 5 kills 5hp monster
+    assert.equal(next.stats.monstersKilled, 1);
+    assert.equal(next.stats.damageDealt, 5);
+  });
+
+  it('damageDealt accumulates without killing', () => {
+    const monster = makeMonster({ x: 3, y: 2, hp: 20, maxHp: 20, defense: 0 });
+    const game = makeGame({ monsters: [monster] });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.stats.damageDealt, 5);
+    assert.equal(next.stats.monstersKilled, 0);
+  });
+
+  it('damageTaken increments when monster hits player', () => {
+    const monster = makeMonster({ x: 3, y: 2, attack: 4, defense: 0 });
+    const game = makeGame({ monsters: [monster] });
+    const next = dispatch(game, { type: 'wait' });
+    const expectedDamage = Math.max(0, 4 - 2); // monster attack - player defense
+    assert.equal(next.stats.damageTaken, expectedDamage);
+  });
+
+  it('potionsUsed increments on potion use', () => {
+    const game = makeGame({ player: { hp: 15 }, inventory: { potions: 2 } });
+    const next = dispatch(game, { type: 'usePotion' });
+    assert.equal(next.stats.potionsUsed, 1);
+  });
+
+  it('stepsTaken increments on successful move', () => {
+    const game = makeGame();
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.stats.stepsTaken, 1);
+  });
+
+  it('stepsTaken does not increment on wall bump', () => {
+    const floor = [];
+    for (let y = 2; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor);
+    const game = makeGame({ map });
+    const next = dispatch(game, { type: 'move', dir: 'n' }); // wall at y=1
+    assert.equal(next.stats.stepsTaken, 0);
+  });
+
+  it('causeOfDeath is set to monster name when player dies', () => {
+    const monster = makeMonster({ x: 3, y: 2, attack: 50, name: 'Dragon' });
+    const game = makeGame({ monsters: [monster] });
+    const next = dispatch(game, { type: 'wait' });
+    assert.equal(next.gameOver, true);
+    assert.equal(next.stats.causeOfDeath, 'Dragon');
+  });
+
+  it('stats carry across levels via descend', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({
+      map,
+      level: 1,
+      stats: { monstersKilled: 3, damageDealt: 25, damageTaken: 10, potionsUsed: 1, stepsTaken: 40, causeOfDeath: null },
+    });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.level, 2);
+    assert.equal(next.stats.monstersKilled, 3);
+    assert.equal(next.stats.damageDealt, 25);
+    assert.equal(next.stats.damageTaken, 10);
+    assert.equal(next.stats.potionsUsed, 1);
+    assert.equal(next.stats.stepsTaken, 40);
   });
 });
 

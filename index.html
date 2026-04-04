@@ -755,7 +755,7 @@
         if (game.gameOver) {
           overlayTitle.textContent = '\u{1F480} Game Over';
           overlayTitle.className = 'game-over';
-          const killer = game.stats.causeOfDeath || 'the dungeon';
+          const killer = game.stats.causeOfDeath || 'dungeon';
           epitaphEl.textContent = `Slain by a ${killer} on level ${game.level}`;
         } else {
           overlayTitle.textContent = '\u{1F3C6} You Win!';
