@@ -18,7 +18,7 @@ help exists.
 
 ## Changes
 
-### 1. Help overlay (both `index.html` and `sprite.html`)
+### 1. Help overlay (`index.html`)
 
 Add a new `#help-overlay` div, styled as a semi-transparent centered panel
 (similar to the existing game-over overlay but with a darker semi-opaque
@@ -38,7 +38,7 @@ background). Contents:
 - `N` — Toggle sound
 - `R` — Restart game
 
-**Touch controls** (show this section only in `sprite.html`):
+**Touch controls** (show this section on touch devices):
 - Swipe to move
 - Use the action buttons at the bottom
 
@@ -76,7 +76,6 @@ resumes normal play.
 ## Files to modify
 
 - `index.html` — add overlay HTML/CSS, help button, keyboard handler, hint
-- `sprite.html` — same as above, plus touch controls section
 - `cli.js` — add help key binding and inline help text
 
 ## Out of scope

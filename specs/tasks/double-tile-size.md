@@ -11,11 +11,11 @@ description: Double the sprite tile size from 28px to 56px so sprites are 2x lar
 
 ## Goal
 
-Make rendered sprites 2× larger in each direction (4× area) in `sprite.html`.
+Make rendered sprites 2× larger in each direction (4× area) in `index.html`.
 
 ## Changes
 
-In `sprite.html`:
+In `index.html`:
 
 1. Change `TILE_SIZE` from `28` to `56`.
 2. Change `FONT_SIZE` from `22` to `44` to keep emoji/ASCII text modes proportional.
@@ -27,7 +27,7 @@ unaffected.
 
 ## Verification
 
-- Open `sprite.html` in a browser.
+- Open `index.html` in a browser.
 - Sprites render at 56×56 px per tile (visually ~2× larger than before).
 - Emoji and ASCII render modes also scale proportionally.
 - Viewport adjusts to show fewer tiles without overflow or layout breakage.
