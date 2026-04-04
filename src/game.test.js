@@ -50,7 +50,7 @@ function makeGame(overrides = {}) {
     player,
     monsters: overrides.monsters || [],
     items: overrides.items || [],
-    inventory: { potions: 0, ...overrides.inventory },
+    inventory: { food: 0, ...overrides.inventory },
     equipment: overrides.equipment || { weapon: null, helmet: null, shield: null },
     level: overrides.level || 1,
     messages: overrides.messages || [],
@@ -60,7 +60,7 @@ function makeGame(overrides = {}) {
     fov,
     stats: {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
-      potionsUsed: 0, stepsTaken: 0, causeOfDeath: null,
+      foodUsed: 0, stepsTaken: 0, causeOfDeath: null,
       ...overrides.stats,
     },
   };
@@ -312,42 +312,42 @@ describe('message log', () => {
   });
 });
 
-describe('items and potions', () => {
-  it('auto-picks up potion when walking over it', () => {
-    const potion = { x: 3, y: 2, type: 'potion', char: '!', color: '#ff44ff' };
-    const game = makeGame({ items: [potion] });
+describe('items and food', () => {
+  it('auto-picks up food when walking over it', () => {
+    const food = { x: 3, y: 2, type: 'food', char: '%', color: '#ff44ff' };
+    const game = makeGame({ items: [food] });
     const next = dispatch(game, { type: 'move', dir: 'e' }); // walk east to 3,2
     assert.equal(next.items.length, 0);
-    assert.equal(next.inventory.potions, 1);
+    assert.equal(next.inventory.food, 1);
     assert.ok(next.messages.some(m => m.includes('pick up')));
   });
 
-  it('usePotion restores HP capped at max', () => {
-    const game = makeGame({ player: { hp: 15 }, inventory: { potions: 2 } });
-    const next = dispatch(game, { type: 'usePotion' });
+  it('useFood restores HP capped at max', () => {
+    const game = makeGame({ player: { hp: 15 }, inventory: { food: 2 } });
+    const next = dispatch(game, { type: 'useFood' });
     assert.equal(next.player.hp, 25); // 15 + 10
-    assert.equal(next.inventory.potions, 1);
+    assert.equal(next.inventory.food, 1);
     assert.ok(next.messages.some(m => m.includes('restore')));
   });
 
-  it('usePotion caps at maxHp', () => {
-    const game = makeGame({ player: { hp: 28 }, inventory: { potions: 1 } });
-    const next = dispatch(game, { type: 'usePotion' });
+  it('useFood caps at maxHp', () => {
+    const game = makeGame({ player: { hp: 28 }, inventory: { food: 1 } });
+    const next = dispatch(game, { type: 'useFood' });
     assert.equal(next.player.hp, 30);
-    assert.equal(next.inventory.potions, 0);
+    assert.equal(next.inventory.food, 0);
   });
 
-  it('usePotion fails with no potions', () => {
-    const game = makeGame({ inventory: { potions: 0 } });
-    const next = dispatch(game, { type: 'usePotion' });
-    assert.equal(next.inventory.potions, 0);
-    assert.ok(next.messages.some(m => m.includes('no potions')));
+  it('useFood fails with no food', () => {
+    const game = makeGame({ inventory: { food: 0 } });
+    const next = dispatch(game, { type: 'useFood' });
+    assert.equal(next.inventory.food, 0);
+    assert.ok(next.messages.some(m => m.includes('no food')));
   });
 
-  it('usePotion fails at full health', () => {
-    const game = makeGame({ player: { hp: 30 }, inventory: { potions: 1 } });
-    const next = dispatch(game, { type: 'usePotion' });
-    assert.equal(next.inventory.potions, 1); // not consumed
+  it('useFood fails at full health', () => {
+    const game = makeGame({ player: { hp: 30 }, inventory: { food: 1 } });
+    const next = dispatch(game, { type: 'useFood' });
+    assert.equal(next.inventory.food, 1); // not consumed
     assert.ok(next.messages.some(m => m.includes('full health')));
   });
 });
@@ -485,9 +485,9 @@ describe('stairs and levels', () => {
       { x: 5, y: 1, w: 3, h: 3 },
     ]);
     map.tiles[2][2] = STAIR;
-    const game = makeGame({ map, level: 1, inventory: { potions: 3 } });
+    const game = makeGame({ map, level: 1, inventory: { food: 3 } });
     const next = dispatch(game, { type: 'descend' });
-    assert.equal(next.inventory.potions, 3);
+    assert.equal(next.inventory.food, 3);
   });
 
   it('HP persists across levels (no regen)', () => {
@@ -531,16 +531,16 @@ describe('createGame structure', () => {
     assert.ok(hasStair, 'Map should contain a stair tile');
   });
 
-  it('spawns potions and equipment on the map', () => {
+  it('spawns food and equipment on the map', () => {
     const game = createGame();
-    const potions = game.items.filter(it => it.type === 'potion');
+    const food = game.items.filter(it => it.type === 'food');
     const equipment = game.items.filter(it => ['dagger', 'sword', 'helmet', 'shield'].includes(it.type));
-    assert.ok(potions.length >= 1 && potions.length <= 2,
-      `Expected 1-2 potions, got ${potions.length}`);
+    assert.ok(food.length >= 1 && food.length <= 2,
+      `Expected 1-2 food, got ${food.length}`);
     assert.ok(equipment.length >= 1 && equipment.length <= 2,
       `Expected 1-2 equipment, got ${equipment.length}`);
-    for (const item of potions) {
-      assert.equal(item.char, '!');
+    for (const item of food) {
+      assert.equal(item.char, '%');
     }
   });
 });
@@ -554,7 +554,7 @@ describe('stats tracking', () => {
     assert.equal(game.stats.monstersKilled, 0);
     assert.equal(game.stats.damageDealt, 0);
     assert.equal(game.stats.damageTaken, 0);
-    assert.equal(game.stats.potionsUsed, 0);
+    assert.equal(game.stats.foodUsed, 0);
     assert.equal(game.stats.stepsTaken, 0);
     assert.equal(game.stats.causeOfDeath, null);
   });
@@ -583,10 +583,10 @@ describe('stats tracking', () => {
     assert.equal(next.stats.damageTaken, expectedDamage);
   });
 
-  it('potionsUsed increments on potion use', () => {
-    const game = makeGame({ player: { hp: 15 }, inventory: { potions: 2 } });
-    const next = dispatch(game, { type: 'usePotion' });
-    assert.equal(next.stats.potionsUsed, 1);
+  it('foodUsed increments on food use', () => {
+    const game = makeGame({ player: { hp: 15 }, inventory: { food: 2 } });
+    const next = dispatch(game, { type: 'useFood' });
+    assert.equal(next.stats.foodUsed, 1);
   });
 
   it('stepsTaken increments on successful move', () => {
@@ -627,14 +627,14 @@ describe('stats tracking', () => {
     const game = makeGame({
       map,
       level: 1,
-      stats: { monstersKilled: 3, damageDealt: 25, damageTaken: 10, potionsUsed: 1, stepsTaken: 40, causeOfDeath: null },
+      stats: { monstersKilled: 3, damageDealt: 25, damageTaken: 10, foodUsed: 1, stepsTaken: 40, causeOfDeath: null },
     });
     const next = dispatch(game, { type: 'descend' });
     assert.equal(next.level, 2);
     assert.equal(next.stats.monstersKilled, 3);
     assert.equal(next.stats.damageDealt, 25);
     assert.equal(next.stats.damageTaken, 10);
-    assert.equal(next.stats.potionsUsed, 1);
+    assert.equal(next.stats.foodUsed, 1);
     assert.equal(next.stats.stepsTaken, 40);
   });
 });

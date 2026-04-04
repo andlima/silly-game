@@ -22,7 +22,7 @@ The sprite sheet is `assets/roguelike-sprites.png` (copy from
 
 | | Col 0 | Col 1 | Col 2 | Col 3 |
 |---|---|---|---|---|
-| **Row 0** | player (mage) | potion (apple) | rat | skeleton (skull) |
+| **Row 0** | player (mage) | food (apple) | rat | skeleton (skull) |
 | **Row 1** | wall (dark stone) | bear | dragon | stair (stone steps) |
 | **Row 2** | dagger | sword | helmet | shield |
 
@@ -53,10 +53,10 @@ A new standalone HTML file modeled on `index.html` with these differences:
 - Hidden tiles: draw nothing (leave as canvas background).
 
 **Preserved from `index.html` (functionally equivalent):**
-- HUD (HP bar, level, potions, equipment display).
+- HUD (HP bar, level, food, equipment display).
 - Message log with opacity fade.
 - Minimap overlay (toggle with `m`).
-- All keyboard input handling (movement, descend, potion, wait, restart,
+- All keyboard input handling (movement, descend, food, wait, restart,
   sound toggle, render mode toggle via Tab).
 - Audio integration (move, attack, pickup, descend, hurt, die sounds).
 - Game-over and win overlay screens.

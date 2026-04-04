@@ -32,7 +32,7 @@ emoji modes.
    | Skeleton     | `s`     | `💀`      | Emoji, double-width    |
    | Bear         | `b`     | `🐻`      | Emoji, double-width    |
    | Dragon       | `d`     | `🐉`      | Emoji, double-width    |
-   | Potion       | `!`     | `🍎`      | Emoji, double-width    |
+   | Food         | `%`     | `🍎`      | Emoji, double-width    |
 
 ### Monster roster
 

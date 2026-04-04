@@ -28,7 +28,7 @@ background). Contents:
 - Arrow keys or WASD
 
 **Actions**
-- `P` — Use potion
+- `P` — Use food
 - `.` or `>` — Descend stairs
 - `5` — Wait a turn
 

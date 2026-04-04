@@ -49,7 +49,7 @@ reports what happens. All game logic is shared; both frontends render it.
 
 - Experience points or leveling up
 - Ranged attacks or spells
-- Items, potions, or equipment
+- Items, food, or equipment
 - Field of view or fog of war
 
 ## Design Notes
