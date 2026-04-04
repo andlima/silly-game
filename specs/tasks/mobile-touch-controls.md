@@ -39,8 +39,7 @@ preventing common mobile annoyances (accidental zoom, scroll bounce).
   on touch-capable devices (detect via `'ontouchstart' in window` or
   media query `(pointer: coarse)`).
 - The bar should contain three buttons:
-  - **Potion** — dispatches `{ type: 'usePotion' }`. Label: a potion/heal
-    icon or the text "Potion".
+  - **Food** — dispatches `{ type: 'useFood' }`. Label: the text "Food".
   - **Descend** — dispatches `{ type: 'descend' }`. Label: a stairs/down
     icon or the text "Descend".
   - **Wait** — dispatches `{ type: 'wait' }`. Label: an hourglass icon or
@@ -87,7 +86,7 @@ preventing common mobile annoyances (accidental zoom, scroll bounce).
 
 - [ ] Swiping on the canvas moves the player in the correct direction.
 - [ ] Swipes below the minimum threshold are ignored (no accidental moves).
-- [ ] Action bar with Potion, Descend, and Wait buttons is visible on
+- [ ] Action bar with Food, Descend, and Wait buttons is visible on
       touch devices.
 - [ ] Action bar is hidden on desktop (keyboard-only) devices.
 - [ ] Each action button dispatches the correct game action and plays audio.

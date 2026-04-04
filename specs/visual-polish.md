@@ -43,7 +43,7 @@ both frontends — no gameplay logic changes.
    - Floor: shades of `#1a1a1a` to `#1e1e1e` (very dark, subtle)
    - Player: `#ffcc00` character on `#44380a` background
    - Stair: `#5599dd` (soft blue)
-   - Potion: `#dd55cc` (soft magenta)
+   - Food: `#dd55cc` (soft magenta)
    - Monsters keep their existing colors but rendered slightly brighter against
      the darker floor
 

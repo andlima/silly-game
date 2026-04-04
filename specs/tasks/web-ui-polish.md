@@ -62,5 +62,5 @@ Add `r` / `R` as a keyboard shortcut to restart the game. Behavior:
 - [ ] `TILE_SIZE` is 28; game renders correctly at the new size.
 - [ ] Pressing `n` toggles mute; mute button icon stays in sync.
 - [ ] Pressing `r` restarts the game from any state.
-- [ ] Existing shortcuts (movement, descend, potion, wait, tab, minimap
+- [ ] Existing shortcuts (movement, descend, food, wait, tab, minimap
       toggle) remain unaffected.

@@ -40,7 +40,7 @@ everything is thumb-reachable. Desktop layout stays unchanged.
 
 **Move HUD info to the bottom (above action bar):**
 - On mobile, reposition the HUD (`#hud`) to `position: fixed; bottom` just
-  above the action bar, so HP, level, potions, and equipment info are all
+  above the action bar, so HP, level, food, and equipment info are all
   near the player's thumbs.
 - Keep the HUD compact: the existing `@media (max-width: 600px)` styles
   already reduce font sizes; ensure nothing wraps awkwardly after relocation.
@@ -112,7 +112,7 @@ overlay drawn on the canvas, not a DOM element.
 - [ ] Tapping a canvas quadrant moves the player in the correct direction.
 - [ ] Taps near the center (ambiguous zone) still resolve to a direction.
 - [ ] Old swipe logic is fully removed.
-- [ ] Action bar buttons (Potion, Descend, Wait, Mute, Help) all work on mobile.
+- [ ] Action bar buttons (Food, Descend, Wait, Mute, Help) all work on mobile.
 - [ ] Canvas viewport correctly accounts for bottom HUD + action bar height.
 - [ ] No layout overflow or wrapping on small screens (test ~375px width).
 - [ ] All existing keyboard controls still work unchanged on desktop.

@@ -27,7 +27,7 @@ stats: {
   monstersKilled: 0,
   damageDealt: 0,
   damageTaken: 0,
-  potionsUsed: 0,
+  foodUsed: 0,
   stepsTaken: 0,
   causeOfDeath: null,   // e.g. "Skeleton" or null if won
 }
@@ -41,7 +41,7 @@ Increment these counters in the appropriate places inside `dispatch()` and
 - **damageDealt** — add the damage value dealt to a monster each attack.
 - **damageTaken** — add the damage value taken from a monster each hit in
   `runMonsterTurns()`.
-- **potionsUsed** — increment in the `'potion'` action handler.
+- **foodUsed** — increment in the `'useFood'` action handler.
 - **stepsTaken** — increment on each successful `'move'` action (only when
   the player actually changes position).
 - **causeOfDeath** — set to the attacking monster's `name` when the player's
@@ -69,7 +69,7 @@ layout. All changes are inside the existing `#overlay` div and its CSS.
 │   Monsters slain ....... 12  │
 │   Damage dealt ......... 87  │
 │   Damage taken ......... 63  │
-│   Potions used ......... 3   │
+│   Food eaten ........... 3   │
 │   Steps taken .......... 94  │
 │                              │
 │        [ Restart ]           │
@@ -124,7 +124,7 @@ logic — use the same stat-display code for both outcomes.
 - [ ] `monstersKilled` increments correctly when killing a monster.
 - [ ] `damageDealt` accumulates total damage the player deals.
 - [ ] `damageTaken` accumulates total damage the player receives.
-- [ ] `potionsUsed` increments when using a potion.
+- [ ] `foodUsed` increments when using food.
 - [ ] `stepsTaken` increments on each successful move.
 - [ ] `causeOfDeath` is set to the monster name that kills the player.
 - [ ] Game over overlay shows epitaph with monster name and level.

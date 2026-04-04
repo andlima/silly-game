@@ -30,11 +30,11 @@ export { EQUIPMENT_TYPES };
 
 const MAX_MESSAGES = 20;
 const WIN_LEVEL = 5;
-const POTION_HEAL = 10;
+const FOOD_HEAL = 10;
 
 const DEFAULT_STATS = {
   monstersKilled: 0, damageDealt: 0, damageTaken: 0,
-  potionsUsed: 0, stepsTaken: 0, causeOfDeath: null,
+  foodUsed: 0, stepsTaken: 0, causeOfDeath: null,
 };
 
 function getStats(game) {
@@ -44,7 +44,7 @@ function getStats(game) {
 export function createGame() {
   return newLevel({
     player: { ...PLAYER_STATS },
-    inventory: { potions: 0 },
+    inventory: { food: 0 },
     equipment: { weapon: null, helmet: null, shield: null },
     level: 1,
     messages: [],
@@ -54,7 +54,7 @@ export function createGame() {
       monstersKilled: 0,
       damageDealt: 0,
       damageTaken: 0,
-      potionsUsed: 0,
+      foodUsed: 0,
       stepsTaken: 0,
       causeOfDeath: null,
     },
@@ -65,7 +65,7 @@ function newLevel(state) {
   const map = createMap();
   const player = { ...state.player, x: map.spawn.x, y: map.spawn.y };
   const monsters = spawnMonsters(map, state.level);
-  const items = spawnPotions(map, monsters);
+  const items = spawnFood(map, monsters);
   spawnEquipment(map, monsters, items, state.level);
   placeStair(map);
 
@@ -94,7 +94,7 @@ function newLevel(state) {
     fov,
     stats: state.stats ? { ...state.stats } : {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
-      potionsUsed: 0, stepsTaken: 0, causeOfDeath: null,
+      foodUsed: 0, stepsTaken: 0, causeOfDeath: null,
     },
   };
 }
@@ -107,9 +107,9 @@ function placeStair(map) {
   map.tiles[cy][cx] = '>';
 }
 
-function spawnPotions(map, monsters) {
+function spawnFood(map, monsters) {
   const items = [];
-  // 1-2 potions per level, placed in random rooms (not room 0)
+  // 1-2 food items per level, placed in random rooms (not room 0)
   const count = 1 + Math.floor(Math.random() * 2);
   for (let i = 0; i < count; i++) {
     const roomIdx = 1 + Math.floor(Math.random() * (map.rooms.length - 1));
@@ -123,7 +123,7 @@ function spawnPotions(map, monsters) {
         !items.some(it => it.x === x && it.y === y) &&
         map.tiles[y][x] !== '>'
       ) {
-        items.push({ x, y, type: 'potion', char: '!', color: '#ff44ff' });
+        items.push({ x, y, type: 'food', char: '%', color: '#ff44ff' });
         break;
       }
     }
@@ -226,8 +226,8 @@ export function dispatch(game, action) {
     case 'descend':
       next = handleDescend(game);
       break;
-    case 'usePotion':
-      next = handleUsePotion(game);
+    case 'useFood':
+      next = handleUseFood(game);
       break;
     case 'restart':
       return createGame();
@@ -269,12 +269,12 @@ function checkPickup(game) {
   const itemHere = items.find(it => it.x === player.x && it.y === player.y);
   if (!itemHere) return game;
 
-  if (itemHere.type === 'potion') {
-    const messages = [...game.messages, 'You pick up a health potion.'];
+  if (itemHere.type === 'food') {
+    const messages = [...game.messages, 'You pick up some food.'];
     return {
       ...game,
       items: items.filter(it => it !== itemHere),
-      inventory: { ...game.inventory, potions: game.inventory.potions + 1 },
+      inventory: { ...game.inventory, food: game.inventory.food + 1 },
       messages: messages.slice(-MAX_MESSAGES),
     };
   }
@@ -328,9 +328,9 @@ function handleDescend(game) {
   });
 }
 
-function handleUsePotion(game) {
-  if (game.inventory.potions <= 0) {
-    const messages = [...game.messages, 'You have no potions.'];
+function handleUseFood(game) {
+  if (game.inventory.food <= 0) {
+    const messages = [...game.messages, 'You have no food.'];
     return { ...game, messages: messages.slice(-MAX_MESSAGES) };
   }
   if (game.player.hp >= game.player.maxHp) {
@@ -338,15 +338,15 @@ function handleUsePotion(game) {
     return { ...game, messages: messages.slice(-MAX_MESSAGES) };
   }
 
-  const newHp = Math.min(game.player.maxHp, game.player.hp + POTION_HEAL);
+  const newHp = Math.min(game.player.maxHp, game.player.hp + FOOD_HEAL);
   const healed = newHp - game.player.hp;
-  const messages = [...game.messages, `You drink a potion and restore ${healed} HP.`];
+  const messages = [...game.messages, `You eat food and restore ${healed} HP.`];
   return {
     ...game,
     player: { ...game.player, hp: newHp },
-    inventory: { ...game.inventory, potions: game.inventory.potions - 1 },
+    inventory: { ...game.inventory, food: game.inventory.food - 1 },
     messages: messages.slice(-MAX_MESSAGES),
-    stats: { ...getStats(game), potionsUsed: getStats(game).potionsUsed + 1 },
+    stats: { ...getStats(game), foodUsed: getStats(game).foodUsed + 1 },
   };
 }
 

@@ -32,7 +32,7 @@ bonuses applied on top of the player's base stats.
 
 1. Define the four equipment items with name, slot, stat bonus, and glyphs.
 2. Add an `equipment` object to game state: `{ weapon: null, helmet: null, shield: null }`.
-3. Equipment items spawn on the floor like potions — 1-2 pieces per level, placed
+3. Equipment items spawn on the floor like food — 1-2 pieces per level, placed
    in random rooms (not the spawn room). Item type should be weighted by dungeon
    level (daggers/helmets on early levels, swords/shields on deeper levels).
 4. Walking onto an equipment tile auto-picks it up. If the slot is empty or the
@@ -74,10 +74,10 @@ bonuses applied on top of the player's base stats.
 
 ## Design Notes
 
-- Equipment items are conceptually similar to potions: they are entries in the
+- Equipment items are conceptually similar to food: they are entries in the
   `items` array on the map with a `type` field (e.g., `'dagger'`, `'sword'`,
   `'helmet'`, `'shield'`).
-- The `checkPickup` function in `game.js` already handles potion auto-pickup;
+- The `checkPickup` function in `game.js` already handles food auto-pickup;
   extend it with an equipment branch.
 - Keep the flat stat model — equipment bonuses are computed at combat time, not
   baked into `player.attack`/`player.defense`. This avoids bookkeeping when
