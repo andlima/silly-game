@@ -493,6 +493,10 @@
 
         // Floor background (uses scaleColor, not globalAlpha)
         if (cell.tile === FLOOR || cell.tile === STAIR) {
+          if (currentAlpha !== -1 && currentAlpha !== 1) {
+            ctx.restore();
+            currentAlpha = -1;
+          }
           ctx.fillStyle = scaleColor(floorShade(mx, my), b);
           ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
         }
