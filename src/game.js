@@ -28,7 +28,7 @@ const EQUIPMENT_TYPES = {
 
 export { EQUIPMENT_TYPES };
 
-const MAX_MESSAGES = 5;
+const MAX_MESSAGES = 20;
 const WIN_LEVEL = 5;
 const POTION_HEAL = 10;
 

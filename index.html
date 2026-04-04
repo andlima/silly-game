@@ -25,9 +25,19 @@
       color: #888;
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 10px;
       padding: 8px 16px;
       border-top: 1px solid #222;
+    }
+    .hud-btn {
+      font-family: monospace;
+      font-size: 14px;
+      background: none;
+      border: 1px solid #444;
+      color: #888;
+      cursor: pointer;
+      padding: 1px 6px;
+      border-radius: 3px;
     }
     #hp-bar-container {
       position: relative;
@@ -65,7 +75,12 @@
       max-width: 800px;
       padding: 0 20px;
       line-height: 1.4;
+      max-height: 6.5em;
+      overflow-y: auto;
     }
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-track { background: #111; }
+    #messages::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
     #messages .msg-line {
       color: #ccaa44;
     }
@@ -130,7 +145,7 @@
       right: 0;
       justify-content: center;
       gap: 8px;
-      padding: 10px 12px;
+      padding: 8px 10px;
       background: #111;
       border-top: 1px solid #333;
       z-index: 5;
@@ -138,10 +153,10 @@
     }
     #action-bar button {
       font-family: monospace;
-      font-size: 16px;
-      min-width: 60px;
-      min-height: 44px;
-      padding: 8px 14px;
+      font-size: 14px;
+      min-width: 48px;
+      min-height: 36px;
+      padding: 6px 10px;
       background: #222;
       color: #ccc;
       border: 1px solid #444;
@@ -236,7 +251,7 @@
     }
 
     @media (max-width: 600px) {
-      #hud { font-size: 13px; gap: 8px; padding: 4px 8px; }
+      #hud { font-size: 13px; gap: 6px; padding: 4px 8px; }
       #hud .equipment { font-size: 11px; }
       #hp-bar-container { width: 100px; }
     }
@@ -253,8 +268,8 @@
     <span class="potions" id="hud-potions"></span>
     <span class="equipment" id="hud-equipment"></span>
     <span class="mode" id="hud-mode"></span>
-    <button id="mute-btn" style="font-family:monospace;font-size:16px;background:none;border:1px solid #444;color:#888;cursor:pointer;padding:2px 8px;border-radius:3px" title="Toggle sound">&#x1f50a;</button>
-    <button id="help-btn" style="font-family:monospace;font-size:16px;background:none;border:1px solid #444;color:#888;cursor:pointer;padding:2px 8px;border-radius:3px" title="Show controls help">?</button>
+    <button id="mute-btn" class="hud-btn" title="Toggle sound">&#x1f50a;</button>
+    <button id="help-btn" class="hud-btn" title="Show controls help">?</button>
   </div>
   <div id="messages"></div>
   <div id="help-hint">Press ? for help</div>
@@ -730,11 +745,27 @@
       document.getElementById('hud-potions').textContent = `Potions: ${game.inventory.potions}`;
 
       const eq = game.equipment;
-      const weaponStr = eq.weapon ? `${eq.weapon.name} +${eq.weapon.bonus}atk` : '\u2014';
-      const helmetStr = eq.helmet ? `${eq.helmet.name} +${eq.helmet.bonus}def` : '\u2014';
-      const shieldStr = eq.shield ? `${eq.shield.name} +${eq.shield.bonus}def` : '\u2014';
-      document.getElementById('hud-equipment').textContent =
-        `Weapon: ${weaponStr} | Helmet: ${helmetStr} | Shield: ${shieldStr}`;
+      const equipParts = [];
+      // weapon
+      if (eq.weapon) {
+        const wEmoji = eq.weapon.name === 'Dagger' ? '\u{1F5E1}\uFE0F' : '\u2694\uFE0F';
+        equipParts.push(`${wEmoji}+${eq.weapon.bonus}`);
+      } else {
+        equipParts.push('<span style="opacity:0.3">\u2694\uFE0F</span>');
+      }
+      // helmet
+      if (eq.helmet) {
+        equipParts.push(`\u{1FA96}+${eq.helmet.bonus}`);
+      } else {
+        equipParts.push('<span style="opacity:0.3">\u{1FA96}</span>');
+      }
+      // shield
+      if (eq.shield) {
+        equipParts.push(`\u{1F6E1}\uFE0F+${eq.shield.bonus}`);
+      } else {
+        equipParts.push('<span style="opacity:0.3">\u{1F6E1}\uFE0F</span>');
+      }
+      document.getElementById('hud-equipment').innerHTML = equipParts.join(' ');
 
       const modeLabels = { sprite: '[sprite]', emoji: '[emoji]', ascii: '[ASCII]' };
       modeEl.textContent = modeLabels[renderMode];
@@ -748,6 +779,7 @@
         msgHtml += `<div class="msg-line" style="opacity:${opacity}">${msgs[i]}</div>`;
       }
       messagesEl.innerHTML = msgHtml;
+      messagesEl.scrollTop = messagesEl.scrollHeight;
 
       if (game.gameOver || game.won) {
         const epitaphEl = document.getElementById('overlay-epitaph');
