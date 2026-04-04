@@ -1,6 +1,6 @@
 ---
 id: mobile-ux-overhaul
-status: done
+status: not-started
 area: web
 priority: 60
 depends_on: []
