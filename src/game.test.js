@@ -115,21 +115,88 @@ describe('runMonsterTurns', () => {
     assert.ok(next.messages.some(m => m.includes('hits you for 2 damage')));
   });
 
-  it('monster moves toward player when within range 6', () => {
-    // Monster at x=7, player at x=2 (Chebyshev dist = 5, within 6)
-    const monster = makeMonster({ x: 7, y: 2 });
+  it('monster moves toward player when within awareness range', () => {
+    // Rat awareness=3, place at Manhattan dist 3 with clear LOS
+    const monster = makeMonster({ x: 5, y: 2, awareness: 3 });
     const game = makeGame({ monsters: [monster] });
     const next = dispatch(game, { type: 'wait' });
-    assert.ok(next.monsters[0].x < 7); // moved closer
+    assert.ok(next.monsters[0].x < 5); // moved closer
   });
 
-  it('monster idles when beyond range 6', () => {
-    // Monster at x=8, y=1, player at x=1, y=5 => Chebyshev = max(7,4) = 7 > 6
-    const monster = makeMonster({ x: 8, y: 1 });
-    const game = makeGame({ player: { x: 1, y: 5 }, monsters: [monster] });
+  it('monster idles when beyond awareness range', () => {
+    // Rat awareness=3, place at Manhattan dist 6 (x=8, y=2, player at x=2, y=2)
+    const monster = makeMonster({ x: 8, y: 2, awareness: 3 });
+    const game = makeGame({ monsters: [monster] });
     const next = dispatch(game, { type: 'wait' });
     assert.equal(next.monsters[0].x, 8);
-    assert.equal(next.monsters[0].y, 1);
+    assert.equal(next.monsters[0].y, 2);
+  });
+
+  it('monster does not chase through walls (LOS blocked)', () => {
+    // Create a map with a wall column separating monster and player
+    const floor = [];
+    for (let y = 1; y <= 3; y++)
+      for (let x = 1; x <= 3; x++)
+        floor.push([x, y]);
+    for (let y = 1; y <= 3; y++)
+      for (let x = 5; x <= 7; x++)
+        floor.push([x, y]);
+    // Wall at x=4 blocks LOS
+    const map = makeMap(9, 5, floor);
+    const monster = makeMonster({ x: 5, y: 2, awareness: 4 });
+    const game = makeGame({ map, player: { x: 3, y: 2 }, monsters: [monster] });
+    const next = dispatch(game, { type: 'wait' });
+    // Monster can't see through wall, should stay put
+    assert.equal(next.monsters[0].x, 5);
+    assert.equal(next.monsters[0].y, 2);
+  });
+
+  it('monster moves cardinally only (no diagonal)', () => {
+    // Monster diagonally from player with open floor
+    const monster = makeMonster({ x: 4, y: 4, awareness: 5 });
+    const game = makeGame({ monsters: [monster] });
+    const next = dispatch(game, { type: 'wait' });
+    const m = next.monsters[0];
+    // Should have moved on exactly one axis
+    const movedX = m.x !== 4;
+    const movedY = m.y !== 4;
+    assert.ok(movedX !== movedY, `Monster should move on exactly one axis, got (${m.x},${m.y})`);
+  });
+
+  it('per-type awareness radius — rat idles at dist 4, dragon chases at dist 4', () => {
+    // Rat awareness=3, dragon awareness=6. Both at Manhattan dist 4 from player.
+    // Rat should idle (4 > 3), dragon should chase (4 <= 6).
+    const rat = makeMonster({ x: 6, y: 2, type: 'rat', name: 'Rat', awareness: 3 });
+    const dragon = makeMonster({ x: 6, y: 4, type: 'dragon', name: 'Dragon',
+      hp: 30, maxHp: 30, attack: 8, defense: 4, awareness: 6 });
+    // Player at (2,2): rat dist = |6-2|+|2-2| = 4, dragon dist = |6-2|+|4-2| = 6
+    // Actually dragon dist is 6, let's put dragon closer
+    const dragon2 = makeMonster({ x: 4, y: 4, type: 'dragon', name: 'Dragon',
+      hp: 30, maxHp: 30, attack: 8, defense: 4, awareness: 6 });
+    // Player at (2,2): dragon dist = |4-2|+|4-2| = 4, well within awareness 6
+    const game = makeGame({ monsters: [rat, dragon2] });
+    const next = dispatch(game, { type: 'wait' });
+    assert.equal(next.monsters[0].x, 6, 'Rat should idle (dist 4 > awareness 3)');
+    const dm = next.monsters[1];
+    const moved = dm.x !== 4 || dm.y !== 4;
+    assert.ok(moved, 'Dragon should chase (dist 4 <= awareness 6)');
+  });
+
+  it('monster staggers after attacking', () => {
+    const monster = makeMonster({ x: 3, y: 2, attack: 4, defense: 100 });
+    const game = makeGame({ monsters: [monster] });
+    // Turn 1: monster attacks
+    const t1 = dispatch(game, { type: 'wait' });
+    const dmg = Math.max(0, 4 - 2);
+    assert.equal(t1.player.hp, 30 - dmg, 'Monster should attack on turn 1');
+    assert.equal(t1.monsters[0].staggered, true, 'Monster should be staggered after attack');
+    // Turn 2: monster is staggered, skips
+    const t2 = dispatch(t1, { type: 'wait' });
+    assert.equal(t2.player.hp, t1.player.hp, 'Player HP should be unchanged on stagger turn');
+    assert.equal(t2.monsters[0].staggered, false, 'Stagger should be cleared');
+    // Turn 3: monster attacks again
+    const t3 = dispatch(t2, { type: 'wait' });
+    assert.equal(t3.player.hp, t2.player.hp - dmg, 'Monster should attack again on turn 3');
   });
 
   it('player death sets gameOver', () => {
