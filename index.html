@@ -102,16 +102,17 @@
       left: 0;
       right: 0;
       justify-content: center;
-      gap: 12px;
-      padding: 10px 16px;
+      gap: 8px;
+      padding: 10px 12px;
       background: #111;
       border-top: 1px solid #333;
       z-index: 5;
+      flex-wrap: wrap;
     }
     #action-bar button {
       font-family: monospace;
       font-size: 16px;
-      min-width: 80px;
+      min-width: 60px;
       min-height: 44px;
       padding: 8px 14px;
       background: #222;
@@ -193,7 +194,7 @@
       #action-bar { display: flex; }
       #hud {
         position: fixed;
-        bottom: 60px;
+        bottom: 60px; /* updated dynamically by JS */
         left: 0;
         right: 0;
         justify-content: center;
@@ -898,7 +899,7 @@
       for (const btn of [muteBtn, helpBtn]) {
         btn.style.minWidth = '44px';
         btn.style.minHeight = '44px';
-        btn.style.padding = '8px 14px';
+        btn.style.padding = '8px 10px';
         btn.style.background = '#222';
         btn.style.color = '#ccc';
         btn.style.border = '1px solid #444';
@@ -906,6 +907,13 @@
         btn.style.touchAction = 'manipulation';
         btn.style.display = '';
       }
+      // Dynamically position HUD above the action bar
+      function updateHudBottom() {
+        const abH = actionBar.offsetHeight;
+        if (abH > 0) hud.style.bottom = abH + 'px';
+      }
+      updateHudBottom();
+      window.addEventListener('resize', updateHudBottom);
     }
 
     // --- Touch tap-quadrant controls ---
