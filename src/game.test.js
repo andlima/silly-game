@@ -302,13 +302,13 @@ describe('spawnMonsters', () => {
 describe('message log', () => {
   beforeEach(() => setRollOverride(() => 0));
   afterEach(() => setRollOverride(null));
-  it('keeps at most 5 messages', () => {
-    const game = makeGame({ messages: ['a', 'b', 'c', 'd'] });
+  it('keeps at most 20 messages', () => {
+    const game = makeGame({ messages: Array.from({ length: 19 }, (_, i) => `msg${i}`) });
     // Attack a monster to generate 2 messages (hit + defeated), then monsters attack too
     const monster = makeMonster({ x: 3, y: 2 });
     const g = { ...game, monsters: [monster] };
     const next = dispatch(g, { type: 'move', dir: 'e' });
-    assert.ok(next.messages.length <= 5);
+    assert.ok(next.messages.length <= 20);
   });
 });
 
