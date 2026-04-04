@@ -13,7 +13,7 @@ A zero-dependency browser + CLI roguelike dungeon crawler built with vanilla Jav
 | Key | Action |
 |-----|--------|
 | Arrow keys / WASD | Move |
-| `p` | Use potion |
+| `p` | Use food |
 | `>` | Descend stairs |
 | `t` | Toggle ASCII/emoji (CLI) |
 
@@ -21,10 +21,10 @@ A zero-dependency browser + CLI roguelike dungeon crawler built with vanilla Jav
 
 - **Procedural dungeon generation** — five increasingly dangerous levels to descend through
 - **Turn-based combat** — four monster types: Rat, Skeleton, Bear, and Dragon
-- **Items & equipment** — health potions, weapons (Dagger, Sword), and armor (Helmet, Shield)
+- **Items & equipment** — food, weapons (Dagger, Sword), and armor (Helmet, Shield)
 - **Field of view** — recursive shadowcasting with a torch radius for atmospheric exploration
 - **Procedural audio** — all sounds synthesized at runtime via the Web Audio API (no audio files)
-- **Game-over stats** — tracks monsters killed, damage dealt/taken, potions used, and steps taken
+- **Game-over stats** — tracks monsters killed, damage dealt/taken, food eaten, and steps taken
 
 ## Tech Highlights
 

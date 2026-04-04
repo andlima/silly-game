@@ -209,9 +209,9 @@ function render() {
   const modeLabel = getRenderMode() === 'enhanced' ? '[emoji]' : '[ASCII]';
   out += hpBar(game.player.hp, game.player.maxHp);
   out += `  ${FG_CYAN}Level: ${game.level}${RESET}`;
-  out += `  ${FG_MAGENTA}Potions: ${game.inventory.potions}${RESET}`;
+  out += `  ${FG_MAGENTA}Food: ${game.inventory.food}${RESET}`;
   out += `  ${FG_GREY}${modeLabel}${RESET}`;
-  out += `  |  ${FG_GREY}p:potion  >/.:descend  Tab:toggle  q:quit${RESET}\n`;
+  out += `  |  ${FG_GREY}p:food  >/.:descend  Tab:toggle  q:quit${RESET}\n`;
 
   // Equipment HUD
   const eq = game.equipment;
@@ -235,7 +235,7 @@ function renderHelp() {
   out += `  ${FG_WHITE}Movement${RESET}\n`;
   out += `    ${FG_CYAN}Arrow keys / WASD${RESET}  ${FG_GREY}Move${RESET}\n\n`;
   out += `  ${FG_WHITE}Actions${RESET}\n`;
-  out += `    ${FG_CYAN}P${RESET}                  ${FG_GREY}Use potion${RESET}\n`;
+  out += `    ${FG_CYAN}P${RESET}                  ${FG_GREY}Use food${RESET}\n`;
   out += `    ${FG_CYAN}. or >${RESET}              ${FG_GREY}Descend stairs${RESET}\n`;
   out += `    ${FG_CYAN}5${RESET}                  ${FG_GREY}Wait a turn${RESET}\n\n`;
   out += `  ${FG_WHITE}Toggles${RESET}\n`;
@@ -327,7 +327,7 @@ process.stdin.on('data', (key) => {
   }
 
   if (key === 'p' || key === 'P') {
-    game = dispatch(game, { type: 'usePotion' });
+    game = dispatch(game, { type: 'useFood' });
     render();
     return;
   }

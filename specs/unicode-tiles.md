@@ -34,7 +34,7 @@ emoji.
    | Skeleton     | `s`     | `💀`      | Emoji, double-width    |
    | Bear         | `b`     | `🐻`      | Emoji, double-width    |
    | Dragon       | `d`     | `🐉`      | Emoji, double-width    |
-   | Potion       | `!`     | `🍎`      | Emoji, double-width    |
+   | Food         | `%`     | `🍎`      | Emoji, double-width    |
 
    The exact emoji choices may be adjusted during implementation as long as
    each entity has a distinct, recognizable glyph.

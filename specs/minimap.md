@@ -53,7 +53,7 @@ generated dungeon without needing to backtrack.
 
 - Clickable minimap (click-to-move)
 - Minimap zoom or resize controls
-- Item markers on minimap (potions, etc.)
+- Item markers on minimap (food, etc.)
 - Minimap for the TUI/CLI frontend
 - Fog-of-war animation on the minimap
 

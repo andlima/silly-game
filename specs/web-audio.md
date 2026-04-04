@@ -93,5 +93,5 @@ audio.
 - Be careful with overlapping sounds: create new oscillator/gain nodes per
   sound rather than reusing a single oscillator.
 - Test by playing the game in a browser — move around, attack a monster, pick
-  up a potion, descend stairs, and die. Each action should produce a distinct
+  up food, descend stairs, and die. Each action should produce a distinct
   short sound.

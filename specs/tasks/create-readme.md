@@ -18,12 +18,12 @@ Add a `README.md` to the project root that gives newcomers a clear picture of wh
 2. **How to play**
    - Browser: open `index.html` in a modern browser (no server needed)
    - CLI: `node cli.js`
-   - Controls: arrow keys / WASD to move, `p` for potion, `>` to descend stairs, `t` to toggle ASCII/emoji (CLI)
+   - Controls: arrow keys / WASD to move, `p` for food, `>` to descend stairs, `t` to toggle ASCII/emoji (CLI)
 
 3. **Game features** — brief descriptions of:
    - Procedural dungeon generation (5 levels)
    - Turn-based combat with 4 monster types (Rat, Skeleton, Bear, Dragon)
-   - Items & equipment (potions, weapons, armor)
+   - Items & equipment (food, weapons, armor)
    - Field of view with recursive shadowcasting
    - Procedural audio synthesis (Web Audio API, no audio files)
    - Game-over stats screen
