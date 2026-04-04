@@ -11,10 +11,10 @@ const DIRECTIONS = {
 };
 
 const MONSTER_TYPES = {
-  rat:      { name: 'Rat',      char: 'r', color: '#cc6633', hp: 5,  attack: 2, defense: 0 },
-  skeleton: { name: 'Skeleton', char: 's', color: '#cccccc', hp: 10, attack: 4, defense: 1 },
-  bear:     { name: 'Bear',     char: 'b', color: '#996633', hp: 20, attack: 6, defense: 3 },
-  dragon:   { name: 'Dragon',   char: 'd', color: '#cc00cc', hp: 30, attack: 8, defense: 4 },
+  rat:      { name: 'Rat',      char: 'r', color: '#cc6633', hp: 5,  attack: 2, defense: 0, awareness: 3 },
+  skeleton: { name: 'Skeleton', char: 's', color: '#cccccc', hp: 10, attack: 4, defense: 1, awareness: 4 },
+  bear:     { name: 'Bear',     char: 'b', color: '#996633', hp: 20, attack: 6, defense: 3, awareness: 5 },
+  dragon:   { name: 'Dragon',   char: 'd', color: '#cc00cc', hp: 30, attack: 8, defense: 4, awareness: 6 },
 };
 
 const PLAYER_STATS = { hp: 30, maxHp: 30, attack: 5, defense: 2 };
@@ -182,7 +182,7 @@ function spawnMonsters(map, level) {
           monsters.push({
             x, y, type, name: template.name, char: template.char,
             color: template.color, hp: template.hp, maxHp: template.hp,
-            attack: template.attack, defense: template.defense,
+            attack: template.attack, defense: template.defense, awareness: template.awareness,
           });
           break;
         }
@@ -392,8 +392,14 @@ function runMonsterTurns(game) {
   for (let i = 0; i < updatedMonsters.length; i++) {
     const m = updatedMonsters[i];
 
-    // Chebyshev distance
-    const dist = Math.max(Math.abs(m.x - currentPlayer.x), Math.abs(m.y - currentPlayer.y));
+    // Skip turn if staggered (recover from attack cooldown)
+    if (m.staggered) {
+      updatedMonsters[i] = { ...m, staggered: false };
+      continue;
+    }
+
+    // Manhattan distance (cardinal-only movement metric)
+    const dist = Math.abs(m.x - currentPlayer.x) + Math.abs(m.y - currentPlayer.y);
 
     if (dist === 1) {
       // Adjacent: attack player
@@ -402,19 +408,28 @@ function runMonsterTurns(game) {
       currentPlayer = { ...currentPlayer, hp: currentPlayer.hp - damage };
       stats = { ...stats, damageTaken: stats.damageTaken + damage };
       messages.push(`The ${m.name} hits you for ${damage} damage.`);
+      updatedMonsters[i] = { ...m, staggered: true };
       if (currentPlayer.hp <= 0) {
         currentPlayer.hp = 0;
         stats = { ...stats, causeOfDeath: m.name };
         dead = true;
         break;
       }
-    } else if (dist <= 6) {
-      // Move toward player (greedy)
-      const dx = Math.sign(currentPlayer.x - m.x);
-      const dy = Math.sign(currentPlayer.y - m.y);
-      const moved = tryMonsterMove(map, updatedMonsters, currentPlayer, i, dx, dy);
-      if (moved) {
-        updatedMonsters = updatedMonsters.map((om, idx) => idx === i ? moved : om);
+    } else {
+      const awareness = m.awareness || 4;
+      if (dist <= awareness) {
+        // Line-of-sight check
+        const monsterFOV = computeFOV(map, m.x, m.y, awareness);
+        const canSee = monsterFOV.has(`${currentPlayer.x},${currentPlayer.y}`);
+        if (canSee) {
+          // Move toward player (greedy cardinal)
+          const dx = Math.sign(currentPlayer.x - m.x);
+          const dy = Math.sign(currentPlayer.y - m.y);
+          const moved = tryMonsterMove(map, updatedMonsters, currentPlayer, i, dx, dy);
+          if (moved) {
+            updatedMonsters = updatedMonsters.map((om, idx) => idx === i ? moved : om);
+          }
+        }
       }
     }
   }
@@ -431,12 +446,18 @@ function runMonsterTurns(game) {
 
 function tryMonsterMove(map, monsters, player, monsterIdx, dx, dy) {
   const m = monsters[monsterIdx];
-  // Try primary direction, then each axis separately
-  const candidates = [
-    { x: m.x + dx, y: m.y + dy },
-    { x: m.x + dx, y: m.y },
-    { x: m.x, y: m.y + dy },
-  ];
+  // Cardinal only — prefer the axis with the larger gap
+  const absDx = Math.abs(player.x - m.x);
+  const absDy = Math.abs(player.y - m.y);
+  const candidates = absDx >= absDy
+    ? [
+        { x: m.x + dx, y: m.y },       // horizontal first
+        { x: m.x, y: m.y + dy },       // vertical fallback
+      ]
+    : [
+        { x: m.x, y: m.y + dy },       // vertical first
+        { x: m.x + dx, y: m.y },       // horizontal fallback
+      ];
 
   for (const pos of candidates) {
     if (pos.x === m.x && pos.y === m.y) continue;
