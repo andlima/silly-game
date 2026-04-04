@@ -577,7 +577,7 @@ describe('computeFOV', () => {
     assert.ok(!fov.has('16,2'), 'Tile in far room should not be visible');
   });
 
-  it('brightness is 1.0 at origin and >= 0.3 at edge', () => {
+  it('brightness is 1.0 at origin and >= 0.45 at edge', () => {
     const floor = [];
     for (let y = 0; y < 20; y++)
       for (let x = 0; x < 20; x++)
@@ -586,7 +586,7 @@ describe('computeFOV', () => {
     const fov = computeFOV(map, 10, 10, 8);
     assert.equal(fov.get('10,10'), 1.0);
     for (const [, b] of fov) {
-      assert.ok(b >= 0.3 && b <= 1.0, `Brightness ${b} out of range [0.3, 1.0]`);
+      assert.ok(b >= 0.45 && b <= 1.0, `Brightness ${b} out of range [0.45, 1.0]`);
     }
   });
 });
