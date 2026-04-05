@@ -1,6 +1,6 @@
 import { WALL } from './map.js';
 
-const TORCH_RADIUS = 8;
+const TORCH_RADIUS = 6;
 
 /**
  * Compute field of view using recursive shadowcasting.
