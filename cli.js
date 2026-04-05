@@ -23,8 +23,7 @@ const SHOW_CURSOR = `${ESC}?25h`;
 // 256-color helpers
 const FG_HP_LOST = `${ESC}38;5;238m`;
 
-// Player colors: dark amber background, golden foreground
-const PLAYER_BG = `${ESC}48;5;94m`;  // dark amber/brown background
+// Player color: golden foreground
 const PLAYER_FG = `${ESC}38;5;220m`; // golden yellow foreground
 
 // Blue-grey wall shade palettes (indexed by position hash for stone texture)
@@ -172,7 +171,7 @@ function render() {
 
       // Visible tiles
       if (c.isPlayer) {
-        line += cell(`${PLAYER_BG}${PLAYER_FG}`, GLYPHS.player) + `${RESET}${BG_BLACK}`;
+        line += cell(`${PLAYER_FG}`, GLYPHS.player) + `${RESET}${BG_BLACK}`;
       } else if (c.monster) {
         const monsterGlyph = GLYPHS[c.monster.type] || { char: c.monster.char, wide: false };
         if (monsterGlyph.wide) {
