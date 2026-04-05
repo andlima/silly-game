@@ -29,13 +29,13 @@ const PLAYER_FG = `${ESC}38;5;220m`; // golden yellow foreground
 
 // Blue-grey wall shade palettes (indexed by position hash for stone texture)
 // Bright tier (near player, high brightness)
-const WALL_SHADES_BRIGHT = [59, 60, 66, 67];
+const WALL_SHADES_BRIGHT = [236, 237, 238, 239];
 // Dim tier (edge of torch radius, low brightness)
-const WALL_SHADES_DIM = [236, 238, 59, 60];
+const WALL_SHADES_DIM = [232, 233, 234, 235];
 // Remembered tier (explored but not currently visible)
 const WALL_SHADES_REMEMBERED = [234, 235, 236, 237];
 // Floor brightness levels (very dark grey shades)
-const FLOOR_SHADES = [233, 234, 235, 236];
+const FLOOR_SHADES = [240, 241, 242, 243];
 // Stair brightness levels
 const STAIR_SHADES = [23, 30, 37, 44];
 // Remembered (explored but not visible) tile colors
