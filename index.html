@@ -438,7 +438,6 @@
     const COLORS = {
       bg:      '#0a0a0a',
       player:  '#ffcc00',
-      playerBg:'#44380a',
       stair:   '#5599dd',
       food:    '#dd55cc',
       dagger:  '#aaaaaa',
@@ -634,8 +633,6 @@
 
           if (cell.isPlayer) {
             ctx.font = `${FONT_SIZE}px monospace`;
-            ctx.fillStyle = scaleColor(COLORS.playerBg, b);
-            ctx.fillRect(px - 1, py - 1, TILE_SIZE + 2, TILE_SIZE + 2);
             ctx.fillStyle = scaleColor(COLORS.player, b);
             ctx.fillText(GLYPHS.player.char, cx, cy);
           } else if (cell.monster) {
