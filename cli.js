@@ -99,7 +99,7 @@ function getViewSize() {
   const cellWidth = getCellWidth();
   const termCols = (process.stdout.columns || 80) - 2;
   const cols = Math.floor(termCols / cellWidth);
-  const msgLines = Math.min(game.messages.length, 5);
+  const msgLines = 5;
   const rows = (process.stdout.rows || 24) - 4 - msgLines; // HUD + messages
   return { cols: Math.max(10, cols), rows: Math.max(6, rows) };
 }
@@ -220,8 +220,13 @@ function render() {
   const shieldStr = eq.shield ? `${eq.shield.name} +${eq.shield.bonus}def` : '-';
   out += `${FG_GREY}Weapon: ${FG_WHITE}${weaponStr}${RESET} ${FG_GREY}| Helmet: ${FG_CYAN}${helmetStr}${RESET} ${FG_GREY}| Shield: ${FG_CYAN}${shieldStr}${RESET}\n`;
 
-  for (const msg of game.messages) {
+  const maxMsgLines = 5;
+  const msgs = game.messages.slice(-maxMsgLines);
+  for (const msg of msgs) {
     out += `${FG_YELLOW}${msg}${RESET}\n`;
+  }
+  for (let i = msgs.length; i < maxMsgLines; i++) {
+    out += '\n';
   }
 
   process.stdout.write(out);
