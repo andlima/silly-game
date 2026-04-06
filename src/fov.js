@@ -43,21 +43,22 @@ function transformOctant(ox, oy, octant, row, col) {
   }
 }
 
+// Symmetric shadowcasting (Albert Ford's variant).
+// Guarantees: if tile A sees B then B sees A, eliminating artifacts
+// where nearby visible tiles are missed.
 function castOctant(map, ox, oy, radius, octant, row, startSlope, endSlope, visible) {
   if (startSlope < endSlope) return;
 
   let nextStartSlope = startSlope;
 
   for (let r = row; r <= radius; r++) {
-    let blocked = false;
+    let foundWall = false;
 
-    for (let col = 0; col <= r; col++) {
-      const leftSlope = (col - 0.5) / (r + 0.5);
-      const rightSlope = (col + 0.5) / (r - 0.5);
+    // Scan columns from high slope (startSlope side) to low slope (endSlope side)
+    const maxCol = Math.floor(r * nextStartSlope + 0.5);
+    const minCol = Math.max(0, Math.ceil(r * endSlope - 0.5));
 
-      if (rightSlope < endSlope) continue;
-      if (leftSlope > startSlope) break;
-
+    for (let col = maxCol; col >= minCol; col--) {
       const { x, y } = transformOctant(ox, oy, octant, r, col);
       const dist = Math.sqrt((x - ox) * (x - ox) + (y - oy) * (y - oy));
 
@@ -70,21 +71,24 @@ function castOctant(map, ox, oy, radius, octant, row, startSlope, endSlope, visi
         }
       }
 
-      if (blocked) {
-        if (isOpaque(map, x, y)) {
-          nextStartSlope = rightSlope;
-        } else {
-          blocked = false;
-          // Keep nextStartSlope from the last blocked cell's right slope
+      const opaque = isOpaque(map, x, y);
+
+      if (opaque) {
+        if (!foundWall) {
+          // Recurse for the open region above this wall
+          const wallSlope = (col + 0.5) / r;
+          castOctant(map, ox, oy, radius, octant, r + 1, nextStartSlope, wallSlope, visible);
+          foundWall = true;
         }
-      } else if (isOpaque(map, x, y) && r < radius) {
-        blocked = true;
-        castOctant(map, ox, oy, radius, octant, r + 1, nextStartSlope, leftSlope, visible);
-        nextStartSlope = rightSlope;
+        // Next open region starts below this wall
+        nextStartSlope = (col - 0.5) / r;
+      } else {
+        foundWall = false;
       }
     }
 
-    if (blocked) break;
+    // If the last cell in the row was a wall, the remaining arc is fully blocked
+    if (foundWall) return;
   }
 }
 
