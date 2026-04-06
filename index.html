@@ -842,10 +842,7 @@
     }
 
     document.addEventListener('keydown', (e) => {
-      if (!audioReady) {
-        initAudio();
-        audioReady = true;
-      }
+      initAudio(); audioReady = true;
 
       // Help overlay toggle
       if (e.key === '?' || e.key === 'h' || e.key === 'H') {
@@ -932,7 +929,7 @@
     const muteBtn = document.getElementById('mute-btn');
     let savedVolume = 0.5;
     muteBtn.addEventListener('click', () => {
-      if (!audioReady) { initAudio(); audioReady = true; }
+      initAudio(); audioReady = true;
       if (getVolume() > 0) {
         savedVolume = getVolume();
         setVolume(0);
@@ -995,7 +992,7 @@
 
     canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      if (!audioReady) { initAudio(); audioReady = true; }
+      initAudio(); audioReady = true;
       const touch = e.changedTouches[0];
       touchStartX = touch.clientX;
       touchStartY = touch.clientY;
@@ -1003,7 +1000,7 @@
 
     canvas.addEventListener('touchend', (e) => {
       e.preventDefault();
-      if (!audioReady) { initAudio(); audioReady = true; }
+      initAudio(); audioReady = true;
       if (game.gameOver || game.won) return;
       const touch = e.changedTouches[0];
       const moveX = touch.clientX - touchStartX;
@@ -1025,19 +1022,23 @@
       dispatchAndPlay({ type: 'move', dir });
     }, { passive: false });
 
+    canvas.addEventListener('click', () => {
+      initAudio(); audioReady = true;
+    });
+
     // --- Action bar buttons ---
     document.getElementById('btn-food').addEventListener('click', () => {
-      if (!audioReady) { initAudio(); audioReady = true; }
+      initAudio(); audioReady = true;
       if (game.gameOver || game.won) return;
       dispatchAndPlay({ type: 'useFood' });
     });
     document.getElementById('btn-descend').addEventListener('click', () => {
-      if (!audioReady) { initAudio(); audioReady = true; }
+      initAudio(); audioReady = true;
       if (game.gameOver || game.won) return;
       dispatchAndPlay({ type: 'descend' });
     });
     document.getElementById('btn-wait').addEventListener('click', () => {
-      if (!audioReady) { initAudio(); audioReady = true; }
+      initAudio(); audioReady = true;
       if (game.gameOver || game.won) return;
       dispatchAndPlay({ type: 'wait' });
     });
