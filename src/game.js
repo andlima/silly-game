@@ -11,10 +11,10 @@ const DIRECTIONS = {
 };
 
 const MONSTER_TYPES = {
-  rat:      { name: 'Rat',      char: 'r', color: '#cc6633', hp: 5,  attack: 2, defense: 0, awareness: 3 },
-  skeleton: { name: 'Skeleton', char: 's', color: '#cccccc', hp: 10, attack: 4, defense: 1, awareness: 4 },
-  bear:     { name: 'Bear',     char: 'b', color: '#996633', hp: 20, attack: 6, defense: 3, awareness: 5 },
-  dragon:   { name: 'Dragon',   char: 'd', color: '#cc00cc', hp: 30, attack: 8, defense: 4, awareness: 6 },
+  rat:      { name: 'Rat',      char: 'r', color: '#cc6633', hp: 5,  attack: 2, defense: 0, awareness: 3, minGold: 0, maxGold: 1 },
+  skeleton: { name: 'Skeleton', char: 's', color: '#cccccc', hp: 10, attack: 4, defense: 1, awareness: 4, minGold: 2, maxGold: 4 },
+  bear:     { name: 'Bear',     char: 'b', color: '#996633', hp: 20, attack: 6, defense: 3, awareness: 5, minGold: 4, maxGold: 8 },
+  dragon:   { name: 'Dragon',   char: 'd', color: '#cc00cc', hp: 30, attack: 8, defense: 4, awareness: 6, minGold: 8, maxGold: 16 },
 };
 
 const PLAYER_STATS = { hp: 30, maxHp: 30, attack: 5, defense: 2 };
@@ -34,7 +34,7 @@ const FOOD_HEAL = 10;
 
 const DEFAULT_STATS = {
   monstersKilled: 0, damageDealt: 0, damageTaken: 0,
-  foodUsed: 0, stepsTaken: 0, causeOfDeath: null,
+  foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
 };
 
 function getStats(game) {
@@ -44,7 +44,7 @@ function getStats(game) {
 export function createGame() {
   return newLevel({
     player: { ...PLAYER_STATS },
-    inventory: { food: 0 },
+    inventory: { food: 0, gold: 0 },
     equipment: { weapon: null, helmet: null, shield: null },
     level: 1,
     messages: [],
@@ -57,6 +57,7 @@ export function createGame() {
       foodUsed: 0,
       stepsTaken: 0,
       causeOfDeath: null,
+      goldCollected: 0,
     },
   });
 }
@@ -67,6 +68,7 @@ function newLevel(state) {
   const monsters = spawnMonsters(map, state.level);
   const items = spawnFood(map, monsters);
   spawnEquipment(map, monsters, items, state.level);
+  spawnTreasure(map, monsters, items, state.level);
   placeStair(map);
 
   // Initialize revealed array (all false) and compute initial FOV
@@ -94,7 +96,7 @@ function newLevel(state) {
     fov,
     stats: state.stats ? { ...state.stats } : {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
-      foodUsed: 0, stepsTaken: 0, causeOfDeath: null,
+      foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
     },
   };
 }
@@ -129,6 +131,26 @@ function spawnFood(map, monsters) {
     }
   }
   return items;
+}
+
+function spawnTreasure(map, monsters, items, level) {
+  // 0-1 gold piles per level, not in room 0
+  if (Math.random() < 0.5) return; // ~50% chance of no gold pile
+  const roomIdx = 1 + Math.floor(Math.random() * (map.rooms.length - 1));
+  const room = map.rooms[roomIdx];
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const x = room.x + Math.floor(Math.random() * room.w);
+    const y = room.y + Math.floor(Math.random() * room.h);
+    if (
+      isWalkable(map, x, y) &&
+      !monsters.some(m => m.x === x && m.y === y) &&
+      !items.some(it => it.x === x && it.y === y) &&
+      map.tiles[y][x] !== '>'
+    ) {
+      items.push({ x, y, type: 'gold', char: '$', color: '#ffcc00', value: 2 * level });
+      break;
+    }
+  }
 }
 
 function pickEquipmentType(level) {
@@ -269,6 +291,18 @@ function checkPickup(game) {
   const itemHere = items.find(it => it.x === player.x && it.y === player.y);
   if (!itemHere) return game;
 
+  if (itemHere.type === 'gold') {
+    const value = itemHere.value || 0;
+    const messages = [...game.messages, `You pick up ${value} gold.`];
+    return {
+      ...game,
+      items: items.filter(it => it !== itemHere),
+      inventory: { ...game.inventory, gold: game.inventory.gold + value },
+      stats: { ...getStats(game), goldCollected: getStats(game).goldCollected + value },
+      messages: messages.slice(-MAX_MESSAGES),
+    };
+  }
+
   if (itemHere.type === 'food') {
     const messages = [...game.messages, 'You pick up some food.'];
     return {
@@ -376,18 +410,28 @@ function playerAttack(game, target) {
   messages.push(`You hit the ${target.name} for ${damage} damage.`);
 
   let monsters;
+  let inventory = game.inventory;
   let stats = { ...getStats(game), damageDealt: getStats(game).damageDealt + damage };
   if (newHp <= 0) {
     messages.push(`The ${target.name} is defeated!`);
     monsters = game.monsters.filter(m => m !== target);
     stats = { ...stats, monstersKilled: stats.monstersKilled + 1 };
+    const template = MONSTER_TYPES[target.type];
+    if (template) {
+      const gold = template.minGold + Math.floor(Math.random() * (template.maxGold - template.minGold + 1));
+      if (gold > 0) {
+        inventory = { ...inventory, gold: inventory.gold + gold };
+        stats = { ...stats, goldCollected: stats.goldCollected + gold };
+        messages.push(`The ${target.name} dropped ${gold} gold.`);
+      }
+    }
   } else {
     monsters = game.monsters.map(m =>
       m === target ? { ...m, hp: newHp } : m
     );
   }
 
-  const updated = { ...game, monsters, messages: messages.slice(-MAX_MESSAGES), stats };
+  const updated = { ...game, monsters, inventory, messages: messages.slice(-MAX_MESSAGES), stats };
   return runMonsterTurns(updated);
 }
 

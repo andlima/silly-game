@@ -283,6 +283,7 @@ function render() {
   out += hpBar(game.player.hp, game.player.maxHp);
   out += `  ${FG_CYAN}Level: ${game.level}${RESET}`;
   out += `  ${FG_MAGENTA}Food: ${game.inventory.food}${RESET}`;
+  out += `  ${FG_YELLOW}Gold: ${game.inventory.gold}${RESET}`;
   out += `  ${FG_GREY}${modeLabel}${RESET}`;
   out += `  |  ${FG_GREY}p:food  >/.:descend  Tab:toggle  q:quit${RESET}\n`;
 
@@ -324,12 +325,23 @@ function renderHelp() {
   process.stdout.write(out);
 }
 
+function renderStats(out) {
+  const s = game.stats || {};
+  out += `\n${FG_GREY}  -- Stats --${RESET}\n`;
+  out += `  ${FG_GREY}Level reached: ${FG_WHITE}${game.level}${RESET}\n`;
+  out += `  ${FG_GREY}Monsters slain: ${FG_WHITE}${s.monstersKilled || 0}${RESET}\n`;
+  out += `  ${FG_GREY}Gold collected: ${FG_YELLOW}${s.goldCollected || 0}${RESET}\n`;
+  out += `  ${FG_GREY}Steps taken: ${FG_WHITE}${s.stepsTaken || 0}${RESET}\n`;
+  return out;
+}
+
 function renderGameOver() {
   let out = CLEAR + BG_BLACK;
   out += `\n\n${FG_RED}  *** GAME OVER ***${RESET}\n\n`;
   for (const msg of game.messages) {
     out += `  ${FG_YELLOW}${msg}${RESET}\n`;
   }
+  out = renderStats(out);
   out += `\n${FG_GREY}  Press r to restart or q to quit${RESET}\n`;
   process.stdout.write(out);
 }
@@ -341,6 +353,7 @@ function renderWin() {
   for (const msg of game.messages) {
     out += `  ${FG_YELLOW}${msg}${RESET}\n`;
   }
+  out = renderStats(out);
   out += `\n${FG_GREY}  Press r to restart or q to quit${RESET}\n`;
   process.stdout.write(out);
 }
