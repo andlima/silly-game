@@ -58,9 +58,15 @@ Item type: `'gold'`, char: `'$'`, color: `'#ffcc00'`.
 - **CLI (`cli.js`)**: show gold count in the status line.
 - **End-game**: include "Gold collected: N" in the stats summary.
 
-### Glyphs
+### Glyphs & rendering
 
-Add a gold entry to `src/glyphs.js` (char `'$'`, emoji coin).
+Add a gold entry to `src/glyphs.js` (char `'$'`, emoji `🪙`).
+
+**Sprite mode:** The current sprite sheet (`assets/roguelike-sprites.png`) is a
+full 4x3 grid with no empty slots. For sprite mode, fall back to drawing the
+gold glyph as text (same approach the renderer already uses for text modes).
+Add `SPRITE_MAP.gold = null` or omit it so `drawSprite` gracefully falls back.
+A dedicated gold sprite can be added later when the sheet is expanded.
 
 ## Files to change
 
@@ -68,7 +74,7 @@ Add a gold entry to `src/glyphs.js` (char `'$'`, emoji coin).
 |------|------|
 | `src/game.js` | `MONSTER_TYPES` gold ranges, `createGame` inventory/stats, `playerAttack` gold award, `spawnTreasure` function, `checkPickup` gold case |
 | `src/glyphs.js` | Gold glyph entry |
-| `index.html` | HUD gold display, end-game gold stat |
+| `index.html` | HUD gold display, end-game gold stat, sprite-mode text fallback for gold item |
 | `cli.js` | HUD gold display |
 | `src/game.test.js` | Tests for gold drop amounts, floor pickup, stat tracking |
 
