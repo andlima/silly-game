@@ -50,7 +50,7 @@ function makeGame(overrides = {}) {
     player,
     monsters: overrides.monsters || [],
     items: overrides.items || [],
-    inventory: { food: 0, ...overrides.inventory },
+    inventory: { food: 0, gold: 0, ...overrides.inventory },
     equipment: overrides.equipment || { weapon: null, helmet: null, shield: null },
     level: overrides.level || 1,
     messages: overrides.messages || [],
@@ -60,7 +60,7 @@ function makeGame(overrides = {}) {
     fov,
     stats: {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
-      foodUsed: 0, stepsTaken: 0, causeOfDeath: null,
+      foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
       ...overrides.stats,
     },
   };
@@ -798,5 +798,75 @@ describe('damage variance', () => {
     const next = dispatch(game, { type: 'wait' });
     assert.equal(next.player.hp, 30); // no damage
     assert.ok(next.messages.some(m => m.includes('for 0 damage')));
+  });
+});
+
+describe('gold from monsters', () => {
+  beforeEach(() => setRollOverride(() => 0));
+  afterEach(() => setRollOverride(null));
+
+  it('killing a skeleton awards gold in range 2-4', () => {
+    const monster = makeMonster({ x: 3, y: 2, type: 'skeleton', name: 'Skeleton', hp: 1, maxHp: 10, defense: 0 });
+    const game = makeGame({ monsters: [monster], inventory: { food: 0, gold: 0 } });
+    // Seed Math.random for gold roll
+    const origRandom = Math.random;
+    Math.random = () => 0.5; // should give minGold + floor(0.5 * (maxGold - minGold + 1)) = 2 + floor(0.5*3) = 2+1 = 3
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    Math.random = origRandom;
+    assert.ok(next.inventory.gold >= 2 && next.inventory.gold <= 4, `Gold should be 2-4 but was ${next.inventory.gold}`);
+    assert.ok(next.messages.some(m => m.includes('dropped') && m.includes('gold')));
+    assert.ok(next.stats.goldCollected >= 2);
+  });
+
+  it('killing a rat can award 0 gold with no message', () => {
+    const monster = makeMonster({ x: 3, y: 2, type: 'rat', name: 'Rat', hp: 1, maxHp: 5, defense: 0 });
+    const game = makeGame({ monsters: [monster], inventory: { food: 0, gold: 0 } });
+    const origRandom = Math.random;
+    Math.random = () => 0; // minGold=0 + floor(0 * 2) = 0
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    Math.random = origRandom;
+    assert.equal(next.inventory.gold, 0);
+    assert.ok(!next.messages.some(m => m.includes('dropped') && m.includes('gold')));
+  });
+
+  it('gold persists across kills', () => {
+    const m1 = makeMonster({ x: 3, y: 2, type: 'skeleton', name: 'Skeleton', hp: 1, maxHp: 10, defense: 0 });
+    const game = makeGame({ monsters: [m1], inventory: { food: 0, gold: 5 } });
+    const origRandom = Math.random;
+    Math.random = () => 0; // minGold=2, gives 2
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    Math.random = origRandom;
+    assert.equal(next.inventory.gold, 7); // 5 + 2
+  });
+});
+
+describe('floor gold pickup', () => {
+  beforeEach(() => setRollOverride(() => 0));
+  afterEach(() => setRollOverride(null));
+
+  it('picks up gold pile on walk', () => {
+    const goldItem = { x: 3, y: 2, type: 'gold', char: '$', color: '#ffcc00', value: 6 };
+    const game = makeGame({ items: [goldItem], inventory: { food: 0, gold: 0 } });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.inventory.gold, 6);
+    assert.equal(next.items.filter(i => i.type === 'gold').length, 0);
+    assert.ok(next.messages.some(m => m.includes('pick up 6 gold')));
+    assert.equal(next.stats.goldCollected, 6);
+  });
+
+  it('gold value scales with level', () => {
+    // value = 2 * level, so level 3 gold pile should be worth 6
+    const goldItem = { x: 3, y: 2, type: 'gold', char: '$', color: '#ffcc00', value: 6 };
+    const game = makeGame({ items: [goldItem], level: 3, inventory: { food: 0, gold: 0 } });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.inventory.gold, 6);
+  });
+});
+
+describe('gold inventory and stats', () => {
+  it('createGame initializes gold in inventory and stats', () => {
+    const game = createGame();
+    assert.equal(game.inventory.gold, 0);
+    assert.equal(game.stats.goldCollected, 0);
   });
 });

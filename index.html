@@ -65,6 +65,7 @@
     }
     #hud .level { color: #44aaff; font-weight: bold; }
     #hud .food { color: #dd55cc; font-weight: bold; }
+    #hud .gold { color: #ffcc00; font-weight: bold; }
     #hud .equipment { color: #99bbdd; font-size: 13px; }
     #hud .mode { color: #888; font-size: 13px; }
     #messages {
@@ -266,6 +267,7 @@
     </div>
     <span class="level" id="hud-level"></span>
     <span class="food" id="hud-food"></span>
+    <span class="gold" id="hud-gold"></span>
     <span class="equipment" id="hud-equipment"></span>
     <span class="mode" id="hud-mode"></span>
     <button id="mute-btn" class="hud-btn" title="Toggle sound">&#x1f50a;</button>
@@ -428,7 +430,9 @@
       const cached = spriteCache[name];
       if (cached) {
         ctx.drawImage(cached, 0, 0, cellW, cellH, px, py, TILE_SIZE, TILE_SIZE);
+        return true;
       }
+      return false;
     }
 
     // --- Color helpers ---
@@ -444,6 +448,7 @@
       sword:   '#dddddd',
       helmet:  '#88aacc',
       shield:  '#99bbdd',
+      gold:    '#ffcc00',
     };
 
     const KEY_MAP = {
@@ -583,7 +588,22 @@
         } else if (cell.monster) {
           drawSprite(cell.monster.type, px, py);
         } else if (cell.item) {
-          drawSprite(cell.item.type, px, py);
+          if (!drawSprite(cell.item.type, px, py)) {
+            // Text fallback for items without sprites (e.g. gold)
+            const glyph = GLYPHS[cell.item.type];
+            const cx = px + TILE_SIZE / 2;
+            const cy = py + TILE_SIZE / 2;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            if (glyph && glyph.wide) {
+              ctx.font = `${FONT_SIZE - 2}px ${EMOJI_FONT}`;
+              ctx.fillText(glyph.char, cx, cy);
+            } else {
+              ctx.font = `${FONT_SIZE}px monospace`;
+              ctx.fillStyle = scaleColor(cell.item.color, b);
+              ctx.fillText((glyph || { char: cell.item.char }).char, cx, cy);
+            }
+          }
         } else if (cell.tile === WALL) {
           drawSprite('wall', px, py);
         } else if (cell.tile === STAIR) {
@@ -740,6 +760,7 @@
 
       document.getElementById('hud-level').textContent = `Level: ${game.level}`;
       document.getElementById('hud-food').textContent = `Food: ${game.inventory.food}`;
+      document.getElementById('hud-gold').textContent = `Gold: ${game.inventory.gold}`;
 
       const eq = game.equipment;
       const equipParts = [];
@@ -797,6 +818,7 @@
           ['Monsters slain', s.monstersKilled],
           ['Damage dealt', s.damageDealt],
           ['Damage taken', s.damageTaken],
+          ['Gold collected', s.goldCollected],
           ['Food eaten', s.foodUsed],
           ['Steps taken', s.stepsTaken],
         ];
