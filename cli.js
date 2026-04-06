@@ -1,7 +1,81 @@
 import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR } from './src/game.js';
-import { GLYPHS, toggleRenderMode, getRenderMode } from './src/glyphs.js';
+import { GLYPHS, GLYPHS_ASCII, toggleRenderMode, getRenderMode } from './src/glyphs.js';
+import { buildState as _buildState } from './src/bot.js';
+
+const BOT_MODE = process.argv.includes('--bot');
 
 let game = createGame();
+
+// ─── Bot protocol ───────────────────────────────────────────────────────────
+
+if (BOT_MODE) {
+  const VALID_ACTIONS = new Set(['move', 'wait', 'useFood', 'descend', 'restart']);
+  const VALID_DIRS = new Set(['n', 's', 'e', 'w']);
+
+  let prevMessageCount = 0;
+
+  function writeLine(obj) {
+    process.stdout.write(JSON.stringify(obj) + '\n');
+  }
+
+  function emitState(action) {
+    const state = _buildState(game, action, prevMessageCount);
+    prevMessageCount = game.messages.length;
+    writeLine(state);
+  }
+
+  // Write initial state
+  emitState(null);
+
+  // Read JSON lines from stdin
+  let buffer = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.resume();
+
+  process.stdin.on('data', (chunk) => {
+    buffer += chunk;
+    let newlineIdx;
+    while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, newlineIdx).trim();
+      buffer = buffer.slice(newlineIdx + 1);
+      if (!line) continue;
+
+      let action;
+      try {
+        action = JSON.parse(line);
+      } catch {
+        writeLine({ error: 'invalid action', detail: 'malformed JSON' });
+        continue;
+      }
+
+      if (!action || typeof action.type !== 'string' || !VALID_ACTIONS.has(action.type)) {
+        writeLine({ error: 'invalid action', detail: `unknown type: ${action?.type}` });
+        continue;
+      }
+
+      if (action.type === 'move' && !VALID_DIRS.has(action.dir)) {
+        writeLine({ error: 'invalid action', detail: `invalid dir: ${action.dir}` });
+        continue;
+      }
+
+      const prevPos = { x: game.player.x, y: game.player.y };
+      game = dispatch(game, action);
+      const moved = action.type === 'move' && (game.player.x !== prevPos.x || game.player.y !== prevPos.y);
+
+      emitState({ ...action, _moved: moved });
+
+      if (game.gameOver || game.won) {
+        process.exit(0);
+      }
+    }
+  });
+
+  process.stdin.on('end', () => {
+    process.exit(0);
+  });
+
+} else {
+// ─── TUI mode ──────────────────────────────────────────────────────────────
 
 // ANSI color helpers
 const ESC = '\x1b[';
@@ -347,3 +421,4 @@ process.on('SIGTERM', cleanup);
 process.stdout.on('resize', render);
 
 render();
+} // end TUI mode
