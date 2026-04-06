@@ -894,11 +894,13 @@
       // Help overlay toggle
       if (e.key === '?' || e.key === 'h' || e.key === 'H') {
         e.preventDefault();
+        stopHoldRepeat();
         toggleHelp();
         return;
       }
       if (e.key === 'Escape' && helpVisible) {
         e.preventDefault();
+        stopHoldRepeat();
         helpVisible = false;
         helpOverlay.classList.remove('visible');
         return;
@@ -963,18 +965,21 @@
 
       if (e.key === '.' || e.key === '>') {
         e.preventDefault();
+        stopHoldRepeat();
         dispatchAndPlay({ type: 'descend' });
         return;
       }
 
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
+        stopHoldRepeat();
         dispatchAndPlay({ type: 'useFood' });
         return;
       }
 
       if (e.key === '5') {
         e.preventDefault();
+        stopHoldRepeat();
         dispatchAndPlay({ type: 'wait' });
       }
     });
@@ -983,6 +988,12 @@
       if (heldDir === e.key) {
         stopHoldRepeat();
       }
+    });
+
+    // Stop hold-repeat when window/tab loses focus (keyup won't fire)
+    window.addEventListener('blur', () => { stopHoldRepeat(); stopTouchHoldRepeat(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { stopHoldRepeat(); stopTouchHoldRepeat(); }
     });
 
     // Mute toggle
