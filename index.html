@@ -841,17 +841,66 @@
       render();
     }
 
+    // --- Hold-to-move constants and state ---
+    const HOLD_INITIAL_DELAY = 300;  // ms before repeat begins
+    const HOLD_REPEAT_INTERVAL = 180; // ms between repeated moves
+
+    let heldDir = null;
+    let holdDelayTimer = null;
+    let holdRepeatTimer = null;
+
+    function stopHoldRepeat() {
+      clearTimeout(holdDelayTimer);
+      clearInterval(holdRepeatTimer);
+      holdDelayTimer = null;
+      holdRepeatTimer = null;
+      heldDir = null;
+    }
+
+    function shouldStopRepeating(oldGame, newGame, dir) {
+      if (newGame.gameOver || newGame.won) return true;
+      // Wall: hero didn't move and it wasn't an attack (no monster at target)
+      const delta = { n: {dx:0,dy:-1}, s: {dx:0,dy:1}, w: {dx:-1,dy:0}, e: {dx:1,dy:0} }[dir];
+      const didMove = newGame.player.x !== oldGame.player.x || newGame.player.y !== oldGame.player.y;
+      const targetX = oldGame.player.x + delta.dx;
+      const targetY = oldGame.player.y + delta.dy;
+      const wasAttack = oldGame.monsters.some(m => m.x === targetX && m.y === targetY);
+      if (!didMove && !wasAttack) return true;
+      // Monster adjacent (cardinal)
+      const px = newGame.player.x;
+      const py = newGame.player.y;
+      const hasAdjacentMonster = newGame.monsters.some(m =>
+        (Math.abs(m.x - px) + Math.abs(m.y - py)) === 1
+      );
+      if (hasAdjacentMonster) return true;
+      return false;
+    }
+
+    function startHoldRepeat(dir) {
+      holdDelayTimer = setTimeout(() => {
+        holdDelayTimer = null;
+        holdRepeatTimer = setInterval(() => {
+          if (game.gameOver || game.won) { stopHoldRepeat(); return; }
+          const oldGame = game;
+          dispatchAndPlay({ type: 'move', dir });
+          if (shouldStopRepeating(oldGame, game, dir)) stopHoldRepeat();
+        }, HOLD_REPEAT_INTERVAL);
+      }, HOLD_INITIAL_DELAY);
+    }
+
     document.addEventListener('keydown', (e) => {
       initAudio(); audioReady = true;
 
       // Help overlay toggle
       if (e.key === '?' || e.key === 'h' || e.key === 'H') {
         e.preventDefault();
+        stopHoldRepeat();
         toggleHelp();
         return;
       }
       if (e.key === 'Escape' && helpVisible) {
         e.preventDefault();
+        stopHoldRepeat();
         helpVisible = false;
         helpOverlay.classList.remove('visible');
         return;
@@ -893,6 +942,7 @@
       // 'r' restarts the game
       if (e.key === 'r' || e.key === 'R') {
         e.preventDefault();
+        stopHoldRepeat();
         game = dispatch(game, { type: 'restart' });
         render();
         return;
@@ -903,26 +953,47 @@
       const dir = KEY_MAP[e.key];
       if (dir) {
         e.preventDefault();
+        // Ignore browser auto-repeat for the same key
+        if (heldDir === e.key) return;
+        // Cancel any existing hold repeat (new direction overrides)
+        stopHoldRepeat();
+        heldDir = e.key;
         dispatchAndPlay({ type: 'move', dir });
+        startHoldRepeat(dir);
         return;
       }
 
       if (e.key === '.' || e.key === '>') {
         e.preventDefault();
+        stopHoldRepeat();
         dispatchAndPlay({ type: 'descend' });
         return;
       }
 
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
+        stopHoldRepeat();
         dispatchAndPlay({ type: 'useFood' });
         return;
       }
 
       if (e.key === '5') {
         e.preventDefault();
+        stopHoldRepeat();
         dispatchAndPlay({ type: 'wait' });
       }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (heldDir === e.key) {
+        stopHoldRepeat();
+      }
+    });
+
+    // Stop hold-repeat when window/tab loses focus (keyup won't fire)
+    window.addEventListener('blur', () => { stopHoldRepeat(); stopTouchHoldRepeat(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { stopHoldRepeat(); stopTouchHoldRepeat(); }
     });
 
     // Mute toggle
@@ -986,9 +1057,33 @@
       window.addEventListener('resize', updateHudBottom);
     }
 
-    // --- Touch tap-quadrant controls ---
+    // --- Touch tap-quadrant controls (with hold-to-move) ---
     let touchStartX = 0;
     let touchStartY = 0;
+    let touchHoldDelayTimer = null;
+    let touchHoldRepeatTimer = null;
+    let touchHoldActive = false;
+
+    function stopTouchHoldRepeat() {
+      clearTimeout(touchHoldDelayTimer);
+      clearInterval(touchHoldRepeatTimer);
+      touchHoldDelayTimer = null;
+      touchHoldRepeatTimer = null;
+      touchHoldActive = false;
+    }
+
+    function computeTouchDir(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = clientX - cx;
+      const dy = clientY - cy;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        return dy < 0 ? 'n' : 's';
+      } else {
+        return dx > 0 ? 'e' : 'w';
+      }
+    }
 
     canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -996,30 +1091,45 @@
       const touch = e.changedTouches[0];
       touchStartX = touch.clientX;
       touchStartY = touch.clientY;
+
+      stopTouchHoldRepeat();
+
+      touchHoldDelayTimer = setTimeout(() => {
+        touchHoldDelayTimer = null;
+        if (game.gameOver || game.won) return;
+        touchHoldActive = true;
+        const dir = computeTouchDir(touchStartX, touchStartY);
+        const oldGame = game;
+        dispatchAndPlay({ type: 'move', dir });
+        if (shouldStopRepeating(oldGame, game, dir)) { stopTouchHoldRepeat(); return; }
+        touchHoldRepeatTimer = setInterval(() => {
+          if (game.gameOver || game.won) { stopTouchHoldRepeat(); return; }
+          const oldG = game;
+          dispatchAndPlay({ type: 'move', dir });
+          if (shouldStopRepeating(oldG, game, dir)) stopTouchHoldRepeat();
+        }, HOLD_REPEAT_INTERVAL);
+      }, HOLD_INITIAL_DELAY);
     }, { passive: false });
 
     canvas.addEventListener('touchend', (e) => {
       e.preventDefault();
       initAudio(); audioReady = true;
+      const wasTouchHold = touchHoldActive;
+      stopTouchHoldRepeat();
+      // If the hold had already activated, don't fire a tap
+      if (wasTouchHold) return;
       if (game.gameOver || game.won) return;
       const touch = e.changedTouches[0];
       const moveX = touch.clientX - touchStartX;
       const moveY = touch.clientY - touchStartY;
       // Only process taps (not drags/scrolls)
       if (Math.abs(moveX) > 15 || Math.abs(moveY) > 15) return;
-      // Compute position relative to canvas center
-      const rect = canvas.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const dx = touch.clientX - cx;
-      const dy = touch.clientY - cy;
-      let dir;
-      if (Math.abs(dy) > Math.abs(dx)) {
-        dir = dy < 0 ? 'n' : 's';
-      } else {
-        dir = dx > 0 ? 'e' : 'w';
-      }
+      const dir = computeTouchDir(touch.clientX, touch.clientY);
       dispatchAndPlay({ type: 'move', dir });
+    }, { passive: false });
+
+    canvas.addEventListener('touchcancel', (e) => {
+      stopTouchHoldRepeat();
     }, { passive: false });
 
     canvas.addEventListener('click', () => {
