@@ -711,13 +711,24 @@
         const scaledW = mapW * MINIMAP_SCALE;
         const scaledH = mapH * MINIMAP_SCALE;
         const margin = 10;
-        const border = 1;
+        const border = 2;
         const mmX = canvas.width - scaledW - margin - border * 2;
         const mmY = margin;
 
-        ctx.fillStyle = '#111';
+        // Rounded corners with clipping (soft fallback to sharp corners)
+        const radius = 4;
+        ctx.save();
+        if (ctx.roundRect) {
+          ctx.beginPath();
+          ctx.roundRect(mmX - border, mmY - border, scaledW + border * 2, scaledH + border * 2, radius);
+          ctx.clip();
+        }
+
+        // Dark brown border
+        ctx.fillStyle = '#5c3a1e';
         ctx.fillRect(mmX - border, mmY - border, scaledW + border * 2, scaledH + border * 2);
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        // Parchment background
+        ctx.fillStyle = '#d4b896';
         ctx.fillRect(mmX, mmY, scaledW, scaledH);
 
         for (let y = 0; y < mapH; y++) {
@@ -728,20 +739,22 @@
             const tile = game.map.tiles[y][x];
 
             if (x === game.player.x && y === game.player.y) {
-              ctx.fillStyle = '#ffcc00';
+              ctx.fillStyle = '#c8962d';
             } else if (inFOV && game.monsters.some(m => m.x === x && m.y === y)) {
-              ctx.fillStyle = '#cc3333';
+              ctx.fillStyle = '#8b1a1a';
             } else if (tile === STAIR) {
-              ctx.fillStyle = '#5599dd';
+              ctx.fillStyle = '#2a4d6e';
             } else if (inFOV) {
-              ctx.fillStyle = tile === WALL ? '#999' : '#555';
+              ctx.fillStyle = tile === WALL ? '#6b4226' : '#d4b896';
             } else {
-              ctx.fillStyle = tile === WALL ? '#666' : '#333';
+              ctx.fillStyle = tile === WALL ? '#8b6d4b' : '#c4a46c';
             }
 
             ctx.fillRect(mmX + x * MINIMAP_SCALE, mmY + y * MINIMAP_SCALE, MINIMAP_SCALE, MINIMAP_SCALE);
           }
         }
+
+        ctx.restore();
       }
 
       // HUD: HP bar
