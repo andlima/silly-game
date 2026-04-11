@@ -634,16 +634,15 @@ function handleFovPushCast(game) {
       // Push the monster away tile-by-tile
       let cx = target.x;
       let cy = target.y;
-      let blocked = false;
+      let blockedByWall = false;
       if (dx === 0 && dy === 0) {
         // Monster is on player tile — can't push
-        blocked = true;
       } else {
         while (true) {
           const nx = cx + dx;
           const ny = cy + dy;
-          if (!isWalkable(game.map, nx, ny)) { blocked = true; break; }
-          if (monsters.some(m => m !== target && m.x === nx && m.y === ny)) { blocked = true; break; }
+          if (!isWalkable(game.map, nx, ny)) { blockedByWall = true; break; }
+          if (monsters.some(m => m !== target && m.x === nx && m.y === ny)) { break; }
           cx = nx;
           cy = ny;
         }
@@ -652,8 +651,8 @@ function handleFovPushCast(game) {
       const didMove = cx !== target.x || cy !== target.y;
       let totalDamage = damage;
 
-      if (!didMove) {
-        // Couldn't move at all — wall bonus
+      if (!didMove && blockedByWall) {
+        // Couldn't move at all and blocked by wall — wall bonus
         totalDamage += spellDef.wallDamage;
         messages.push(`The ${target.name} slams into the wall!`);
       }

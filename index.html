@@ -670,6 +670,10 @@
             if (glyph && glyph.wide) {
               ctx.font = `${FONT_SIZE - 2}px ${EMOJI_FONT}`;
               ctx.fillText(glyph.char, cx, cy);
+              if (cell.monster.frozenTurns > 0) {
+                ctx.fillStyle = 'rgba(136, 204, 255, 0.4)';
+                ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+              }
             } else {
               ctx.font = `${FONT_SIZE}px monospace`;
               ctx.fillStyle = scaleColor(monsterColor, Math.min(1, b * 1.15));

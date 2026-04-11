@@ -1286,6 +1286,30 @@ describe('Whirlwind (fov_push)', () => {
     assert.ok(next.messages.some(m => m.includes('slams into the wall')));
   });
 
+  it('no wall bonus when blocked by another monster', () => {
+    // Player at (2,1), monsterA at (3,1), monsterB at (4,1), wall at (5,1)
+    // monsterA is blocked by monsterB — should NOT get wall bonus
+    const floor = [[1,1],[2,1],[3,1],[4,1]];
+    const map = makeMap(6, 3, floor);
+    const monsterA = makeMonster({ x: 3, y: 1, hp: 20, maxHp: 20 });
+    const monsterB = makeMonster({ x: 4, y: 1, hp: 20, maxHp: 20 });
+    const game = makeGame({
+      map,
+      player: { x: 2, y: 1, hp: 30, maxHp: 30, attack: 5, defense: 2 },
+      monsters: [monsterA, monsterB],
+      spell: { type: 'whirlwind', name: 'Whirlwind', charges: 3 },
+    });
+    const next = dispatch(game, { type: 'cast' });
+    // monsterB is against wall — gets wall bonus (2 + 2 = 4 damage => hp 16)
+    // monsterA is blocked by monsterB — only base damage (2 damage => hp 18)
+    const mA = next.monsters.find(m => m.hp === 18);
+    const mB = next.monsters.find(m => m.hp === 16);
+    assert.ok(mA, 'Monster blocked by another monster should take only base damage (hp 18)');
+    assert.ok(mB, 'Monster blocked by wall should take wall bonus damage (hp 16)');
+    assert.ok(!next.messages.filter(m => m.includes('slams into the wall')).length || next.messages.filter(m => m.includes('slams into the wall')).length === 1,
+      'Only the wall-blocked monster should slam into the wall');
+  });
+
   it('fizzles with no enemies in FOV', () => {
     const game = makeGame({
       monsters: [],
@@ -1317,26 +1341,27 @@ describe('scroll pickup replacement', () => {
 });
 
 describe('scroll spawn randomization', () => {
-  it('produces varied spell types over many games', () => {
+  it('produces varied spell types over many level-2 games', () => {
     const seenTypes = new Set();
-    // Create many level-2 games and check what scroll types appear
-    for (let i = 0; i < 200; i++) {
+    // Create level-1 games, place stair at player, descend to level 2
+    // which invokes spawnScrolls with level >= 2
+    for (let i = 0; i < 300; i++) {
       const game = createGame();
-      // Advance to level 2 to allow scroll spawns
-      // Instead, directly check SPELL_TYPES keys are used
-      for (const item of game.items) {
+      // Place stair under player to enable descend
+      game.map.tiles[game.player.y][game.player.x] = '>';
+      const level2 = dispatch(game, { type: 'descend' });
+      for (const item of level2.items) {
         if (item.type === 'scroll') {
           seenTypes.add(item.spellType);
         }
       }
     }
-    // Level 1 doesn't spawn scrolls, so seenTypes may be empty
-    // Verify SPELL_TYPES has all four keys
-    const keys = Object.keys(SPELL_TYPES);
-    assert.equal(keys.length, 4);
-    assert.ok(keys.includes('firebolt'));
-    assert.ok(keys.includes('lightning'));
-    assert.ok(keys.includes('frost'));
-    assert.ok(keys.includes('whirlwind'));
+    // With 300 iterations and 50% spawn chance, we should see multiple types
+    // spawnScrolls picks uniformly from 4 spell types
+    assert.ok(seenTypes.size >= 2, `Expected at least 2 spell types, got ${seenTypes.size}: ${[...seenTypes]}`);
+    // Verify all types are valid SPELL_TYPES keys
+    for (const t of seenTypes) {
+      assert.ok(SPELL_TYPES[t], `Unknown spell type: ${t}`);
+    }
   });
 });
