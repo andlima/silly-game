@@ -61,6 +61,7 @@ function makeGame(overrides = {}) {
     stats: {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
       foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
+      idolOfferings: 0,
       ...overrides.stats,
     },
   };
@@ -440,7 +441,7 @@ describe('stairs and levels', () => {
   it('descend on non-stair tile shows message', () => {
     const game = makeGame();
     const next = dispatch(game, { type: 'descend' });
-    assert.ok(next.messages.some(m => m.includes('no stairs')));
+    assert.ok(next.messages.some(m => m.includes('Nothing to interact with here.')));
   });
 
   it('descend on stair tile advances to next level', () => {
@@ -868,5 +869,138 @@ describe('gold inventory and stats', () => {
     const game = createGame();
     assert.equal(game.inventory.gold, 0);
     assert.equal(game.stats.goldCollected, 0);
+  });
+});
+
+describe('idol offering', () => {
+  it('successful offering deducts gold, increases maxHp, fully heals, and logs message', () => {
+    const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
+    const game = makeGame({ items: [idol], inventory: { gold: 25 }, player: { hp: 20, maxHp: 30 } });
+    const next = dispatch(game, { type: 'interact' });
+    assert.equal(next.inventory.gold, 0);
+    assert.equal(next.player.maxHp, 35);
+    assert.equal(next.player.hp, 35);
+    assert.ok(next.messages.some(m => m.includes('offer 25 gold to the idol')));
+    assert.ok(next.messages.some(m => m.includes('+5 max HP, fully healed')));
+    assert.equal(next.items.length, 1, 'Idol should remain on the map');
+    assert.equal(next.stats.idolOfferings, 1);
+  });
+
+  it('offering at full HP still increases maxHp and heals to new max', () => {
+    const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
+    const game = makeGame({ items: [idol], inventory: { gold: 25 }, player: { hp: 30, maxHp: 30 } });
+    const next = dispatch(game, { type: 'interact' });
+    assert.equal(next.player.maxHp, 35);
+    assert.equal(next.player.hp, 35);
+    assert.equal(next.inventory.gold, 0);
+  });
+
+  it('offering at low HP fully heals to new max', () => {
+    const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
+    const game = makeGame({ items: [idol], inventory: { gold: 25 }, player: { hp: 3, maxHp: 30 } });
+    const next = dispatch(game, { type: 'interact' });
+    assert.equal(next.player.hp, 35);
+    assert.equal(next.player.maxHp, 35);
+  });
+
+  it('not enough gold shows message and does not change state', () => {
+    const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
+    const game = makeGame({ items: [idol], inventory: { gold: 24 }, player: { hp: 20, maxHp: 30 } });
+    const next = dispatch(game, { type: 'interact' });
+    assert.equal(next.inventory.gold, 24);
+    assert.equal(next.player.hp, 20);
+    assert.equal(next.player.maxHp, 30);
+    assert.ok(next.messages.some(m => m.includes('demands 25 gold')));
+    assert.equal(next.stats.idolOfferings, 0);
+  });
+
+  it('multi-use: player with 50 gold can offer twice', () => {
+    const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
+    const game = makeGame({ items: [idol], inventory: { gold: 50 }, player: { hp: 20, maxHp: 30 } });
+    const g1 = dispatch(game, { type: 'interact' });
+    const g2 = dispatch(g1, { type: 'interact' });
+    assert.equal(g2.inventory.gold, 0);
+    assert.equal(g2.player.maxHp, 40);
+    assert.equal(g2.player.hp, 40);
+    assert.equal(g2.items.length, 1, 'Idol should still be on the map');
+  });
+
+  it('walking onto idol does not pick it up', () => {
+    const idol = { x: 3, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
+    const game = makeGame({ items: [idol] });
+    const next = dispatch(game, { type: 'move', dir: 'e' }); // walk east to 3,2
+    assert.equal(next.items.length, 1, 'Idol should remain in items');
+    assert.equal(next.items[0].type, 'idol');
+    assert.ok(!next.messages.some(m => m.includes('pick up')));
+  });
+
+  it('interact on stair still descends', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({ map, level: 1 });
+    const next = dispatch(game, { type: 'interact' });
+    assert.equal(next.level, 2);
+    assert.ok(next.messages.some(m => m.includes('level 2')));
+  });
+
+  it('interact on empty floor shows nothing-to-interact message', () => {
+    const game = makeGame();
+    const next = dispatch(game, { type: 'interact' });
+    assert.ok(next.messages.some(m => m.includes('Nothing to interact with here.')));
+  });
+
+  it('descend action alias on stair still advances level (bot compat)', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({ map, level: 1 });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.level, 2);
+  });
+
+  it('descend action alias on idol with enough gold performs offering', () => {
+    const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
+    const game = makeGame({ items: [idol], inventory: { gold: 25 } });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.inventory.gold, 0);
+    assert.equal(next.player.maxHp, 35);
+    assert.ok(next.messages.some(m => m.includes('offer 25 gold')));
+  });
+
+  it('idol does not spawn on level 1 or level 5', () => {
+    // Level 1 — no idol
+    const game1 = createGame();
+    assert.equal(game1.level, 1);
+    const idols1 = game1.items.filter(it => it.type === 'idol');
+    assert.equal(idols1.length, 0, 'No idol should spawn on level 1');
+
+    // Advance to level 5 using a stair and check
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game5 = makeGame({ map, level: 4 });
+    const next = dispatch(game5, { type: 'descend' });
+    assert.equal(next.level, 5);
+    const idols5 = next.items.filter(it => it.type === 'idol');
+    assert.equal(idols5.length, 0, 'No idol should spawn on level 5');
   });
 });
