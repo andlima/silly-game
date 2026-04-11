@@ -84,6 +84,18 @@ function aggregateStats(results) {
     noShield: noShield.length > 0 ? noShield.filter(r => r.won).length / noShield.length : 0,
   };
 
+  // Economy
+  const avgGoldCollected = results.reduce((s, r) => s + (r.stats.goldCollected || 0), 0) / n;
+  const avgIdolOfferings = results.reduce((s, r) => s + (r.stats.idolOfferings || 0), 0) / n;
+
+  // Idol impact on win rate
+  const usedIdol = results.filter(r => (r.stats.idolOfferings || 0) > 0);
+  const noIdol = results.filter(r => (r.stats.idolOfferings || 0) === 0);
+  const idolWinRate = {
+    usedIdol: usedIdol.length > 0 ? usedIdol.filter(r => r.won).length / usedIdol.length : 0,
+    noIdol: noIdol.length > 0 ? noIdol.filter(r => r.won).length / noIdol.length : 0,
+  };
+
   return {
     runs: n,
     summary: {
@@ -103,8 +115,13 @@ function aggregateStats(results) {
       avgFoodFound: +avgFoodFound.toFixed(1),
       avgFoodUsed: +avgFoodUsed.toFixed(1),
     },
+    economy: {
+      avgGoldCollected: +avgGoldCollected.toFixed(1),
+      avgIdolOfferings: +avgIdolOfferings.toFixed(2),
+    },
     equipment,
     equipmentWinRate,
+    idolWinRate,
   };
 }
 
@@ -141,6 +158,10 @@ function printReport(agg) {
   console.log(`  Avg food found:    ${agg.items.avgFoodFound}`);
   console.log(`  Avg food used:     ${agg.items.avgFoodUsed}`);
 
+  console.log('\nEconomy');
+  console.log(`  Avg gold collected:  ${agg.economy.avgGoldCollected}`);
+  console.log(`  Avg idol offerings:  ${agg.economy.avgIdolOfferings}`);
+
   console.log('\nEquipment (% of games where found)');
   console.log(`  Dagger:  ${pct(agg.equipment.dagger).padStart(4)}`);
   console.log(`  Sword:   ${pct(agg.equipment.sword).padStart(4)}`);
@@ -152,6 +173,10 @@ function printReport(agg) {
   console.log(`  No weapon:    ${pct(agg.equipmentWinRate.noWeapon)} win rate`);
   console.log(`  Had shield:   ${pct(agg.equipmentWinRate.hadShield)} win rate`);
   console.log(`  No shield:    ${pct(agg.equipmentWinRate.noShield)} win rate`);
+
+  console.log('\nIdol impact on win rate');
+  console.log(`  Used idol:    ${pct(agg.idolWinRate.usedIdol)} win rate`);
+  console.log(`  No idol:      ${pct(agg.idolWinRate.noIdol)} win rate`);
 
   console.log('');
 }

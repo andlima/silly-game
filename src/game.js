@@ -31,7 +31,7 @@ export { EQUIPMENT_TYPES };
 const MAX_MESSAGES = 20;
 const WIN_LEVEL = 5;
 const FOOD_HEAL = 10;
-const IDOL_COST = 25;
+export const IDOL_COST = 25;
 const IDOL_MAXHP_BONUS = 5;
 
 const DEFAULT_STATS = {
