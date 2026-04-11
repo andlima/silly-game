@@ -52,6 +52,8 @@ function makeGame(overrides = {}) {
     items: overrides.items || [],
     inventory: { food: 0, gold: 0, ...overrides.inventory },
     equipment: overrides.equipment || { weapon: null, helmet: null, shield: null },
+    spell: overrides.spell !== undefined ? overrides.spell : null,
+    castPending: overrides.castPending || false,
     level: overrides.level || 1,
     messages: overrides.messages || [],
     gameOver: overrides.gameOver || false,
@@ -61,7 +63,7 @@ function makeGame(overrides = {}) {
     stats: {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
       foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-      idolOfferings: 0,
+      idolOfferings: 0, spellsCast: 0,
       ...overrides.stats,
     },
   };
@@ -1034,5 +1036,115 @@ describe('idol offering', () => {
     assert.equal(g2.inventory.gold, 0);
     assert.equal(g2.player.maxHp, 35);
     assert.ok(g2.messages.some(m => m.includes('demands 35 gold')));
+  });
+});
+
+describe('spell system', () => {
+  beforeEach(() => setRollOverride(() => 0));
+  afterEach(() => setRollOverride(null));
+
+  it('picking up a scroll into an empty spell slot equips it', () => {
+    const scroll = { x: 3, y: 2, type: 'scroll', spellType: 'firebolt', char: '~', color: '#ff6600' };
+    const game = makeGame({ items: [scroll], spell: null });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.items.length, 0);
+    assert.ok(next.spell);
+    assert.equal(next.spell.type, 'firebolt');
+    assert.equal(next.spell.charges, 3);
+    assert.ok(next.messages.some(m => m.includes('pick up a Firebolt scroll')));
+  });
+
+  it('casting firebolt hits the first monster in line and deals spell damage (ignores defense)', () => {
+    // Monster at (5,2), player at (2,2), cast east
+    const monster = makeMonster({ x: 5, y: 2, hp: 20, maxHp: 20, defense: 10 });
+    const game = makeGame({
+      monsters: [monster],
+      spell: { type: 'firebolt', name: 'Firebolt', charges: 3 },
+      castPending: true,
+    });
+    const next = dispatch(game, { type: 'castDir', dir: 'e' });
+    // Spell damage = 8, ignores defense
+    assert.equal(next.monsters[0].hp, 12); // 20 - 8
+    assert.ok(next.messages.some(m => m.includes('Firebolt hits') && m.includes('8 damage')));
+    assert.equal(next.castPending, false);
+  });
+
+  it('casting firebolt that hits a wall logs a fizzle message', () => {
+    // No monsters in the line, wall at boundary
+    const game = makeGame({
+      monsters: [],
+      spell: { type: 'firebolt', name: 'Firebolt', charges: 3 },
+      castPending: true,
+    });
+    const next = dispatch(game, { type: 'castDir', dir: 'e' });
+    assert.ok(next.messages.some(m => m.includes('fizzle')));
+  });
+
+  it('charges decrement on each cast; scroll is cleared at 0 charges', () => {
+    const monster1 = makeMonster({ x: 5, y: 2, hp: 50, maxHp: 50, defense: 10 });
+    const game = makeGame({
+      monsters: [monster1],
+      spell: { type: 'firebolt', name: 'Firebolt', charges: 1 },
+      castPending: true,
+    });
+    const next = dispatch(game, { type: 'castDir', dir: 'e' });
+    assert.equal(next.spell, null);
+    assert.ok(next.messages.some(m => m.includes('crumbles to dust')));
+  });
+
+  it('casting with no spell logs appropriate message', () => {
+    const game = makeGame({ spell: null });
+    const next = dispatch(game, { type: 'cast' });
+    assert.ok(next.messages.some(m => m.includes('no spell')));
+    assert.equal(next.castPending, false);
+  });
+
+  it('castCancel clears pending state without consuming a turn', () => {
+    const monster = makeMonster({ x: 3, y: 2, attack: 4, defense: 100 });
+    const game = makeGame({
+      monsters: [monster],
+      spell: { type: 'firebolt', name: 'Firebolt', charges: 3 },
+      castPending: true,
+    });
+    const next = dispatch(game, { type: 'castCancel' });
+    assert.equal(next.castPending, false);
+    assert.ok(next.messages.some(m => m.includes('cancelled')));
+    // Monster should NOT have attacked (no turn consumed)
+    assert.equal(next.player.hp, 30);
+  });
+
+  it('monster killed by spell drops gold and increments stats', () => {
+    const monster = makeMonster({ x: 3, y: 2, hp: 5, maxHp: 5, defense: 0, type: 'rat' });
+    const game = makeGame({
+      monsters: [monster],
+      spell: { type: 'firebolt', name: 'Firebolt', charges: 3 },
+      castPending: true,
+    });
+    const next = dispatch(game, { type: 'castDir', dir: 'e' });
+    assert.equal(next.monsters.length, 0);
+    assert.equal(next.stats.monstersKilled, 1);
+    assert.equal(next.stats.spellsCast, 1);
+  });
+
+  it('spell slot persists across level transitions', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({
+      map,
+      level: 1,
+      spell: { type: 'firebolt', name: 'Firebolt', charges: 2 },
+    });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.level, 2);
+    assert.ok(next.spell);
+    assert.equal(next.spell.type, 'firebolt');
+    assert.equal(next.spell.charges, 2);
   });
 });

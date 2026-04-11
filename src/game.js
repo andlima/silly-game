@@ -28,6 +28,19 @@ const EQUIPMENT_TYPES = {
 
 export { EQUIPMENT_TYPES };
 
+const SPELL_TYPES = {
+  firebolt: {
+    name: 'Firebolt',
+    char: '~',
+    color: '#ff6600',
+    damage: 8,
+    charges: 3,
+    description: 'Hurls a bolt of fire in a straight line.',
+  },
+};
+
+export { SPELL_TYPES };
+
 const MAX_MESSAGES = 20;
 const WIN_LEVEL = 5;
 const FOOD_HEAL = 10;
@@ -36,7 +49,7 @@ const IDOL_MAXHP_BONUS = 5;
 const DEFAULT_STATS = {
   monstersKilled: 0, damageDealt: 0, damageTaken: 0,
   foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-  idolOfferings: 0,
+  idolOfferings: 0, spellsCast: 0,
 };
 
 function getStats(game) {
@@ -48,6 +61,8 @@ export function createGame() {
     player: { ...PLAYER_STATS },
     inventory: { food: 0, gold: 0 },
     equipment: { weapon: null, helmet: null, shield: null },
+    spell: null,
+    castPending: false,
     level: 1,
     messages: [],
     gameOver: false,
@@ -61,6 +76,7 @@ export function createGame() {
       causeOfDeath: null,
       goldCollected: 0,
       idolOfferings: 0,
+      spellsCast: 0,
     },
   });
 }
@@ -73,6 +89,7 @@ function newLevel(state) {
   spawnEquipment(map, monsters, items, state.level);
   spawnTreasure(map, monsters, items, state.level);
   spawnIdol(map, monsters, items, state.level);
+  spawnScrolls(map, monsters, items, state.level);
   placeStair(map);
 
   // Initialize revealed array (all false) and compute initial FOV
@@ -92,6 +109,8 @@ function newLevel(state) {
     items,
     inventory: { ...state.inventory },
     equipment: state.equipment ? { ...state.equipment } : { weapon: null, helmet: null, shield: null },
+    spell: state.spell || null,
+    castPending: state.castPending || false,
     level: state.level,
     messages: state.messages,
     gameOver: false,
@@ -101,7 +120,7 @@ function newLevel(state) {
     stats: state.stats ? { ...state.stats } : {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
       foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-      idolOfferings: 0,
+      idolOfferings: 0, spellsCast: 0,
     },
   };
 }
@@ -172,6 +191,27 @@ function spawnIdol(map, monsters, items, level) {
       map.tiles[y][x] !== '>'
     ) {
       items.push({ x, y, type: 'idol', char: 'I', color: '#ccaa44' });
+      break;
+    }
+  }
+}
+
+function spawnScrolls(map, monsters, items, level) {
+  if (level < 2) return;
+  if (Math.random() < 0.5) return; // 0-1 scrolls
+  const roomIdx = 1 + Math.floor(Math.random() * (map.rooms.length - 1));
+  const room = map.rooms[roomIdx];
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const x = room.x + Math.floor(Math.random() * room.w);
+    const y = room.y + Math.floor(Math.random() * room.h);
+    if (
+      isWalkable(map, x, y) &&
+      !monsters.some(m => m.x === x && m.y === y) &&
+      !items.some(it => it.x === x && it.y === y) &&
+      map.tiles[y][x] !== '>'
+    ) {
+      const spell = SPELL_TYPES.firebolt;
+      items.push({ x, y, type: 'scroll', spellType: 'firebolt', char: spell.char, color: spell.color });
       break;
     }
   }
@@ -276,6 +316,15 @@ export function dispatch(game, action) {
     case 'useFood':
       next = handleUseFood(game);
       break;
+    case 'cast':
+      next = handleCast(game);
+      break;
+    case 'castDir':
+      next = handleCastDir(game, action.dir);
+      break;
+    case 'castCancel':
+      next = handleCastCancel(game);
+      break;
     case 'restart':
       return createGame();
     default:
@@ -339,6 +388,32 @@ function checkPickup(game) {
     };
   }
 
+  if (itemHere.type === 'scroll') {
+    const spellDef = SPELL_TYPES[itemHere.spellType];
+    if (!spellDef) return game;
+    const currentSpell = game.spell;
+    if (!currentSpell) {
+      const messages = [...game.messages, `You pick up a ${spellDef.name} scroll (${spellDef.charges} charges).`];
+      return {
+        ...game,
+        items: items.filter(it => it !== itemHere),
+        spell: { type: itemHere.spellType, name: spellDef.name, charges: spellDef.charges },
+        messages: messages.slice(-MAX_MESSAGES),
+      };
+    }
+    if (currentSpell.type === itemHere.spellType && currentSpell.charges <= spellDef.charges) {
+      const messages = [...game.messages, `You swap for a fresher ${spellDef.name} scroll.`];
+      return {
+        ...game,
+        items: items.filter(it => it !== itemHere),
+        spell: { type: itemHere.spellType, name: spellDef.name, charges: spellDef.charges },
+        messages: messages.slice(-MAX_MESSAGES),
+      };
+    }
+    const messages = [...game.messages, 'You already carry a spell scroll.'];
+    return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+  }
+
   const eqDef = EQUIPMENT_TYPES[itemHere.type];
   if (eqDef) {
     const slot = eqDef.slot;
@@ -400,6 +475,8 @@ function handleInteract(game) {
     player: { ...game.player },
     inventory: { ...game.inventory },
     equipment: { ...game.equipment },
+    spell: game.spell,
+    castPending: game.castPending,
     level: game.level + 1,
     messages: messages.slice(-MAX_MESSAGES),
     gameOver: false,
@@ -428,6 +505,89 @@ function handleUseFood(game) {
     messages: messages.slice(-MAX_MESSAGES),
     stats: { ...getStats(game), foodUsed: getStats(game).foodUsed + 1 },
   };
+}
+
+function handleCast(game) {
+  if (!game.spell || game.spell.charges <= 0) {
+    const messages = [...game.messages, 'You have no spell to cast.'];
+    return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+  }
+  const messages = [...game.messages, 'Cast spell \u2014 choose direction (\u2190\u2191\u2193\u2192).'];
+  return { ...game, castPending: true, messages: messages.slice(-MAX_MESSAGES) };
+}
+
+function handleCastDir(game, dir) {
+  if (!game.castPending || !game.spell) return game;
+  const delta = DIRECTIONS[dir];
+  if (!delta) return game;
+
+  const messages = [...game.messages];
+  let { player, monsters, spell } = game;
+  const spellDef = SPELL_TYPES[spell.type];
+  let stats = { ...getStats(game), spellsCast: getStats(game).spellsCast + 1 };
+  let inventory = game.inventory;
+
+  // Resolve bolt: travel from player position in chosen direction
+  let bx = player.x + delta.dx;
+  let by = player.y + delta.dy;
+  let hitMonster = null;
+  while (isWalkable(game.map, bx, by)) {
+    hitMonster = monsters.find(m => m.x === bx && m.y === by);
+    if (hitMonster) break;
+    bx += delta.dx;
+    by += delta.dy;
+  }
+
+  if (hitMonster) {
+    const damage = spellDef.damage;
+    const newHp = hitMonster.hp - damage;
+    messages.push(`Your ${spellDef.name} hits the ${hitMonster.name} for ${damage} damage!`);
+    if (newHp <= 0) {
+      messages.push(`The ${hitMonster.name} is defeated!`);
+      monsters = monsters.filter(m => m !== hitMonster);
+      stats = { ...stats, monstersKilled: stats.monstersKilled + 1 };
+      const template = MONSTER_TYPES[hitMonster.type];
+      if (template) {
+        const gold = template.minGold + Math.floor(Math.random() * (template.maxGold - template.minGold + 1));
+        if (gold > 0) {
+          inventory = { ...inventory, gold: inventory.gold + gold };
+          stats = { ...stats, goldCollected: stats.goldCollected + gold };
+          messages.push(`The ${hitMonster.name} dropped ${gold} gold.`);
+        }
+      }
+    } else {
+      monsters = monsters.map(m => m === hitMonster ? { ...m, hp: newHp } : m);
+    }
+  } else {
+    messages.push(`Your ${spellDef.name} fizzles against the wall.`);
+  }
+
+  // Decrement charges
+  let newSpell;
+  const newCharges = spell.charges - 1;
+  if (newCharges <= 0) {
+    newSpell = null;
+    messages.push(`Your ${spellDef.name} scroll crumbles to dust.`);
+  } else {
+    newSpell = { ...spell, charges: newCharges };
+  }
+
+  const updated = {
+    ...game,
+    monsters,
+    inventory,
+    spell: newSpell,
+    castPending: false,
+    messages: messages.slice(-MAX_MESSAGES),
+    stats,
+  };
+  return runMonsterTurns(updated);
+}
+
+function handleCastCancel(game) {
+  if (!game.castPending) return game;
+  const messages = [...game.messages, 'Spell cancelled.'];
+  return { ...game, castPending: false, messages: messages.slice(-MAX_MESSAGES) };
 }
 
 let _rollOverride = null;
