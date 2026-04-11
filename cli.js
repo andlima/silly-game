@@ -250,14 +250,14 @@ function render() {
       } else if (c.monster) {
         const monsterGlyph = GLYPHS[c.monster.type] || { char: c.monster.char, wide: false };
         if (monsterGlyph.wide) {
-          // Emoji renders in native colors, no ANSI override
           line += cell('', monsterGlyph);
         } else {
-          const color = MONSTER_COLORS[c.monster.type] || FG_WHITE;
+          const color = c.monster.frozenTurns > 0 ? FG_CYAN : (MONSTER_COLORS[c.monster.type] || FG_WHITE);
           line += cell(color, monsterGlyph);
         }
       } else if (c.item) {
-        const itemGlyph = GLYPHS[c.item.type] || { char: c.item.char, wide: false };
+        const glyphKey = c.item.type === 'scroll' ? c.item.spellType : c.item.type;
+        const itemGlyph = GLYPHS[glyphKey] || GLYPHS[c.item.type] || { char: c.item.char, wide: false };
         if (itemGlyph.wide) {
           line += cell('', itemGlyph);
         } else {

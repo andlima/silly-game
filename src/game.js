@@ -30,12 +30,24 @@ export { EQUIPMENT_TYPES };
 
 const SPELL_TYPES = {
   firebolt: {
-    name: 'Firebolt',
-    char: '~',
-    color: '#ff6600',
-    damage: 8,
-    charges: 3,
+    name: 'Firebolt', char: '~', color: '#ff6600',
+    damage: 8, charges: 3, mechanic: 'bolt',
     description: 'Hurls a bolt of fire in a straight line.',
+  },
+  lightning: {
+    name: 'Lightning Bolt', char: '*', color: '#ffff00',
+    damage: 4, charges: 3, mechanic: 'burst', range: 3,
+    description: 'Unleashes a burst of lightning that strikes all nearby enemies.',
+  },
+  frost: {
+    name: 'Frost', char: '*', color: '#00ccff',
+    damage: 3, charges: 3, mechanic: 'bolt', freezeDuration: 3,
+    description: 'Fires a freezing bolt that damages and immobilizes an enemy.',
+  },
+  whirlwind: {
+    name: 'Whirlwind', char: '*', color: '#aaddaa',
+    damage: 2, charges: 3, mechanic: 'fov_push', wallDamage: 2,
+    description: 'Summons a whirlwind that pushes all visible enemies away.',
   },
 };
 
@@ -210,8 +222,10 @@ function spawnScrolls(map, monsters, items, level) {
       !items.some(it => it.x === x && it.y === y) &&
       map.tiles[y][x] !== '>'
     ) {
-      const spell = SPELL_TYPES.firebolt;
-      items.push({ x, y, type: 'scroll', spellType: 'firebolt', char: spell.char, color: spell.color });
+      const spellKeys = Object.keys(SPELL_TYPES);
+      const spellKey = spellKeys[Math.floor(Math.random() * spellKeys.length)];
+      const spell = SPELL_TYPES[spellKey];
+      items.push({ x, y, type: 'scroll', spellType: spellKey, char: spell.char, color: spell.color });
       break;
     }
   }
@@ -410,8 +424,15 @@ function checkPickup(game) {
         messages: messages.slice(-MAX_MESSAGES),
       };
     }
-    const messages = [...game.messages, 'You already carry a spell scroll.'];
-    return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+    // Replace current spell with the new one
+    const messages = [...game.messages, `You discard your ${currentSpell.name} scroll and pick up a ${spellDef.name} scroll (${spellDef.charges} charges).`];
+    return {
+      ...game,
+      items: items.filter(it => it !== itemHere),
+      spell: { type: itemHere.spellType, name: spellDef.name, charges: spellDef.charges },
+      castPending: false,
+      messages: messages.slice(-MAX_MESSAGES),
+    };
   }
 
   const eqDef = EQUIPMENT_TYPES[itemHere.type];
@@ -512,8 +533,172 @@ function handleCast(game) {
     const messages = [...game.messages, 'You have no spell to cast.'];
     return { ...game, messages: messages.slice(-MAX_MESSAGES) };
   }
+  const spellDef = SPELL_TYPES[game.spell.type];
+  if (spellDef.mechanic === 'burst') {
+    return handleBurstCast(game);
+  }
+  if (spellDef.mechanic === 'fov_push') {
+    return handleFovPushCast(game);
+  }
+  // bolt mechanic: prompt for direction
   const messages = [...game.messages, 'Cast spell \u2014 choose direction (\u2190\u2191\u2193\u2192).'];
   return { ...game, castPending: true, messages: messages.slice(-MAX_MESSAGES) };
+}
+
+function handleBurstCast(game) {
+  const { player, spell } = game;
+  const spellDef = SPELL_TYPES[spell.type];
+  const messages = [...game.messages];
+  let monsters = game.monsters;
+  let inventory = game.inventory;
+  let stats = { ...getStats(game), spellsCast: getStats(game).spellsCast + 1 };
+
+  // Find all monsters within Chebyshev distance
+  const inRange = monsters.filter(m =>
+    Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y)) <= spellDef.range
+  );
+
+  if (inRange.length === 0) {
+    messages.push('Your Lightning Bolt crackles but finds no target.');
+  } else {
+    for (const target of inRange) {
+      const damage = spellDef.damage;
+      const newHp = target.hp - damage;
+      messages.push(`Your ${spellDef.name} hits the ${target.name} for ${damage} damage!`);
+      if (newHp <= 0) {
+        messages.push(`The ${target.name} is defeated!`);
+        monsters = monsters.filter(m => m !== target);
+        stats = { ...stats, monstersKilled: stats.monstersKilled + 1 };
+        const template = MONSTER_TYPES[target.type];
+        if (template) {
+          const gold = template.minGold + Math.floor(Math.random() * (template.maxGold - template.minGold + 1));
+          if (gold > 0) {
+            inventory = { ...inventory, gold: inventory.gold + gold };
+            stats = { ...stats, goldCollected: stats.goldCollected + gold };
+            messages.push(`The ${target.name} dropped ${gold} gold.`);
+          }
+        }
+      } else {
+        monsters = monsters.map(m => m === target ? { ...m, hp: newHp } : m);
+      }
+    }
+  }
+
+  let newSpell;
+  const newCharges = spell.charges - 1;
+  if (newCharges <= 0) {
+    newSpell = null;
+    messages.push(`Your ${spellDef.name} scroll crumbles to dust.`);
+  } else {
+    newSpell = { ...spell, charges: newCharges };
+  }
+
+  const updated = {
+    ...game,
+    monsters,
+    inventory,
+    spell: newSpell,
+    castPending: false,
+    messages: messages.slice(-MAX_MESSAGES),
+    stats,
+  };
+  return runMonsterTurns(updated);
+}
+
+function handleFovPushCast(game) {
+  const { player, spell, fov } = game;
+  const spellDef = SPELL_TYPES[spell.type];
+  const messages = [...game.messages];
+  let monsters = [...game.monsters];
+  let inventory = game.inventory;
+  let stats = { ...getStats(game), spellsCast: getStats(game).spellsCast + 1 };
+
+  // Find all monsters in FOV
+  const inFOV = monsters.filter(m => fov && fov.has(`${m.x},${m.y}`));
+
+  if (inFOV.length === 0) {
+    messages.push('Your Whirlwind howls but finds nothing to push.');
+  } else {
+    // Sort farthest first (Chebyshev distance) to avoid blocking
+    const sorted = [...inFOV].sort((a, b) => {
+      const distA = Math.max(Math.abs(a.x - player.x), Math.abs(a.y - player.y));
+      const distB = Math.max(Math.abs(b.x - player.x), Math.abs(b.y - player.y));
+      return distB - distA;
+    });
+
+    for (const target of sorted) {
+      const damage = spellDef.damage;
+      const dx = Math.sign(target.x - player.x);
+      const dy = Math.sign(target.y - player.y);
+
+      // Push the monster away tile-by-tile
+      let cx = target.x;
+      let cy = target.y;
+      let blocked = false;
+      if (dx === 0 && dy === 0) {
+        // Monster is on player tile — can't push
+        blocked = true;
+      } else {
+        while (true) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (!isWalkable(game.map, nx, ny)) { blocked = true; break; }
+          if (monsters.some(m => m !== target && m.x === nx && m.y === ny)) { blocked = true; break; }
+          cx = nx;
+          cy = ny;
+        }
+      }
+
+      const didMove = cx !== target.x || cy !== target.y;
+      let totalDamage = damage;
+
+      if (!didMove) {
+        // Couldn't move at all — wall bonus
+        totalDamage += spellDef.wallDamage;
+        messages.push(`The ${target.name} slams into the wall!`);
+      }
+
+      const newHp = target.hp - totalDamage;
+      messages.push(`Your ${spellDef.name} hits the ${target.name} for ${totalDamage} damage!`);
+
+      if (newHp <= 0) {
+        messages.push(`The ${target.name} is defeated!`);
+        monsters = monsters.filter(m => m !== target);
+        stats = { ...stats, monstersKilled: stats.monstersKilled + 1 };
+        const template = MONSTER_TYPES[target.type];
+        if (template) {
+          const gold = template.minGold + Math.floor(Math.random() * (template.maxGold - template.minGold + 1));
+          if (gold > 0) {
+            inventory = { ...inventory, gold: inventory.gold + gold };
+            stats = { ...stats, goldCollected: stats.goldCollected + gold };
+            messages.push(`The ${target.name} dropped ${gold} gold.`);
+          }
+        }
+      } else {
+        monsters = monsters.map(m => m === target ? { ...m, hp: newHp, x: cx, y: cy } : m);
+      }
+    }
+  }
+
+  let newSpell;
+  const newCharges = spell.charges - 1;
+  if (newCharges <= 0) {
+    newSpell = null;
+    messages.push(`Your ${spellDef.name} scroll crumbles to dust.`);
+  } else {
+    newSpell = { ...spell, charges: newCharges };
+  }
+
+  const updated = {
+    ...game,
+    monsters,
+    inventory,
+    spell: newSpell,
+    castPending: false,
+    messages: messages.slice(-MAX_MESSAGES),
+    stats,
+  };
+  return runMonsterTurns(updated);
 }
 
 function handleCastDir(game, dir) {
@@ -556,7 +741,11 @@ function handleCastDir(game, dir) {
         }
       }
     } else {
-      monsters = monsters.map(m => m === hitMonster ? { ...m, hp: newHp } : m);
+      const frozen = spellDef.freezeDuration ? { frozenTurns: spellDef.freezeDuration } : {};
+      monsters = monsters.map(m => m === hitMonster ? { ...m, hp: newHp, ...frozen } : m);
+      if (spellDef.freezeDuration) {
+        messages.push(`The ${hitMonster.name} is frozen!`);
+      }
     }
   } else {
     messages.push(`Your ${spellDef.name} fizzles against the wall.`);
@@ -651,6 +840,12 @@ function runMonsterTurns(game) {
 
   for (let i = 0; i < updatedMonsters.length; i++) {
     const m = updatedMonsters[i];
+
+    // Skip turn if frozen
+    if (m.frozenTurns > 0) {
+      updatedMonsters[i] = { ...m, frozenTurns: m.frozenTurns - 1 };
+      continue;
+    }
 
     // Skip turn if staggered (recover from attack cooldown)
     if (m.staggered) {
