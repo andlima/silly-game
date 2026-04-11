@@ -875,12 +875,12 @@ describe('gold inventory and stats', () => {
 describe('idol offering', () => {
   it('successful offering deducts gold, increases maxHp, fully heals, and logs message', () => {
     const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
-    const game = makeGame({ items: [idol], inventory: { gold: 25 }, player: { hp: 20, maxHp: 30 } });
+    const game = makeGame({ items: [idol], inventory: { gold: 30 }, player: { hp: 20, maxHp: 30 } });
     const next = dispatch(game, { type: 'interact' });
     assert.equal(next.inventory.gold, 0);
     assert.equal(next.player.maxHp, 35);
     assert.equal(next.player.hp, 35);
-    assert.ok(next.messages.some(m => m.includes('offer 25 gold to the idol')));
+    assert.ok(next.messages.some(m => m.includes('offer 30 gold to the idol')));
     assert.ok(next.messages.some(m => m.includes('+5 max HP, fully healed')));
     assert.equal(next.items.length, 1, 'Idol should remain on the map');
     assert.equal(next.stats.idolOfferings, 1);
@@ -888,7 +888,7 @@ describe('idol offering', () => {
 
   it('offering at full HP still increases maxHp and heals to new max', () => {
     const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
-    const game = makeGame({ items: [idol], inventory: { gold: 25 }, player: { hp: 30, maxHp: 30 } });
+    const game = makeGame({ items: [idol], inventory: { gold: 30 }, player: { hp: 30, maxHp: 30 } });
     const next = dispatch(game, { type: 'interact' });
     assert.equal(next.player.maxHp, 35);
     assert.equal(next.player.hp, 35);
@@ -897,7 +897,7 @@ describe('idol offering', () => {
 
   it('offering at low HP fully heals to new max', () => {
     const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
-    const game = makeGame({ items: [idol], inventory: { gold: 25 }, player: { hp: 3, maxHp: 30 } });
+    const game = makeGame({ items: [idol], inventory: { gold: 30 }, player: { hp: 3, maxHp: 30 } });
     const next = dispatch(game, { type: 'interact' });
     assert.equal(next.player.hp, 35);
     assert.equal(next.player.maxHp, 35);
@@ -905,19 +905,22 @@ describe('idol offering', () => {
 
   it('not enough gold shows message and does not change state', () => {
     const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
-    const game = makeGame({ items: [idol], inventory: { gold: 24 }, player: { hp: 20, maxHp: 30 } });
+    const game = makeGame({ items: [idol], inventory: { gold: 29 }, player: { hp: 20, maxHp: 30 } });
     const next = dispatch(game, { type: 'interact' });
-    assert.equal(next.inventory.gold, 24);
+    assert.equal(next.inventory.gold, 29);
     assert.equal(next.player.hp, 20);
     assert.equal(next.player.maxHp, 30);
-    assert.ok(next.messages.some(m => m.includes('demands 25 gold')));
+    assert.ok(next.messages.some(m => m.includes('demands 30 gold')));
     assert.equal(next.stats.idolOfferings, 0);
   });
 
-  it('multi-use: player with 50 gold can offer twice', () => {
+  it('multi-use: player with 65 gold can offer twice', () => {
     const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
-    const game = makeGame({ items: [idol], inventory: { gold: 50 }, player: { hp: 20, maxHp: 30 } });
+    const game = makeGame({ items: [idol], inventory: { gold: 65 }, player: { hp: 20, maxHp: 30 } });
     const g1 = dispatch(game, { type: 'interact' });
+    assert.equal(g1.inventory.gold, 35);
+    assert.equal(g1.player.maxHp, 35);
+    assert.equal(g1.player.hp, 35);
     const g2 = dispatch(g1, { type: 'interact' });
     assert.equal(g2.inventory.gold, 0);
     assert.equal(g2.player.maxHp, 40);
@@ -973,11 +976,11 @@ describe('idol offering', () => {
 
   it('descend action alias on idol with enough gold performs offering', () => {
     const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
-    const game = makeGame({ items: [idol], inventory: { gold: 25 } });
+    const game = makeGame({ items: [idol], inventory: { gold: 30 } });
     const next = dispatch(game, { type: 'descend' });
     assert.equal(next.inventory.gold, 0);
     assert.equal(next.player.maxHp, 35);
-    assert.ok(next.messages.some(m => m.includes('offer 25 gold')));
+    assert.ok(next.messages.some(m => m.includes('offer 30 gold')));
   });
 
   it('idol does not spawn on level 1 or level 5', () => {
@@ -1002,5 +1005,34 @@ describe('idol offering', () => {
     assert.equal(next.level, 5);
     const idols5 = next.items.filter(it => it.type === 'idol');
     assert.equal(idols5.length, 0, 'No idol should spawn on level 5');
+  });
+
+  it('cost scales with current maxHp — successive offerings cost more', () => {
+    const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
+    // Need 30 + 35 + 40 = 105 gold for three offerings
+    const game = makeGame({ items: [idol], inventory: { gold: 105 }, player: { hp: 30, maxHp: 30 } });
+    const g1 = dispatch(game, { type: 'interact' });
+    assert.equal(g1.inventory.gold, 75);   // paid 30
+    assert.equal(g1.player.maxHp, 35);
+    const g2 = dispatch(g1, { type: 'interact' });
+    assert.equal(g2.inventory.gold, 40);   // paid 35
+    assert.equal(g2.player.maxHp, 40);
+    const g3 = dispatch(g2, { type: 'interact' });
+    assert.equal(g3.inventory.gold, 0);    // paid 40
+    assert.equal(g3.player.maxHp, 45);
+    assert.equal(g3.stats.idolOfferings, 3);
+  });
+
+  it('second offering demands the new (higher) maxHp cost', () => {
+    const idol = { x: 2, y: 2, type: 'idol', char: 'I', color: '#ccaa44' };
+    // 30 gold = exactly one offering, then second attempt should fail with "demands 35"
+    const game = makeGame({ items: [idol], inventory: { gold: 30 }, player: { hp: 30, maxHp: 30 } });
+    const g1 = dispatch(game, { type: 'interact' });
+    assert.equal(g1.inventory.gold, 0);
+    assert.equal(g1.player.maxHp, 35);
+    const g2 = dispatch(g1, { type: 'interact' });
+    assert.equal(g2.inventory.gold, 0);
+    assert.equal(g2.player.maxHp, 35);
+    assert.ok(g2.messages.some(m => m.includes('demands 35 gold')));
   });
 });
