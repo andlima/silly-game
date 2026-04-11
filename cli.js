@@ -151,6 +151,7 @@ const EQUIPMENT_COLORS = {
   sword:  FG_WHITE,
   helmet: FG_CYAN,
   shield: FG_CYAN,
+  scroll: FG_RED,
 };
 
 const KEY_MAP = {
@@ -285,14 +286,15 @@ function render() {
   out += `  ${FG_MAGENTA}Food: ${game.inventory.food}${RESET}`;
   out += `  ${FG_YELLOW}Gold: ${game.inventory.gold}${RESET}`;
   out += `  ${FG_GREY}${modeLabel}${RESET}`;
-  out += `  |  ${FG_GREY}p:food  >/.:use  Tab:toggle  q:quit${RESET}\n`;
+  out += `  |  ${FG_GREY}p:food  f:cast  >/.:use  Tab:toggle  q:quit${RESET}\n`;
 
   // Equipment HUD
   const eq = game.equipment;
   const weaponStr = eq.weapon ? `${eq.weapon.name} +${eq.weapon.bonus}atk` : '-';
   const helmetStr = eq.helmet ? `${eq.helmet.name} +${eq.helmet.bonus}def` : '-';
   const shieldStr = eq.shield ? `${eq.shield.name} +${eq.shield.bonus}def` : '-';
-  out += `${FG_GREY}Weapon: ${FG_WHITE}${weaponStr}${RESET} ${FG_GREY}| Helmet: ${FG_CYAN}${helmetStr}${RESET} ${FG_GREY}| Shield: ${FG_CYAN}${shieldStr}${RESET}\n`;
+  const spellStr = game.spell ? `${game.spell.name} x${game.spell.charges}` : '\u2014';
+  out += `${FG_GREY}Weapon: ${FG_WHITE}${weaponStr}${RESET} ${FG_GREY}| Helmet: ${FG_CYAN}${helmetStr}${RESET} ${FG_GREY}| Shield: ${FG_CYAN}${shieldStr}${RESET} ${FG_GREY}| Spell: ${FG_RED}${spellStr}${RESET}\n`;
 
   const maxMsgLines = 5;
   const msgs = game.messages.slice(-maxMsgLines);
@@ -332,6 +334,7 @@ function renderStats(out) {
   out += `  ${FG_GREY}Monsters slain: ${FG_WHITE}${s.monstersKilled || 0}${RESET}\n`;
   out += `  ${FG_GREY}Gold collected: ${FG_YELLOW}${s.goldCollected || 0}${RESET}\n`;
   out += `  ${FG_GREY}Idol offerings: ${FG_WHITE}${s.idolOfferings || 0}${RESET}\n`;
+  out += `  ${FG_GREY}Spells cast: ${FG_WHITE}${s.spellsCast || 0}${RESET}\n`;
   out += `  ${FG_GREY}Steps taken: ${FG_WHITE}${s.stepsTaken || 0}${RESET}\n`;
   return out;
 }
@@ -401,6 +404,25 @@ process.stdin.on('data', (key) => {
   // Tab key toggles render mode
   if (key === '\t') {
     toggleRenderMode();
+    render();
+    return;
+  }
+
+  // Cast-pending mode: direction keys cast, anything else cancels
+  if (game.castPending) {
+    const dir = KEY_MAP[key];
+    if (dir) {
+      game = dispatch(game, { type: 'castDir', dir });
+    } else {
+      game = dispatch(game, { type: 'castCancel' });
+    }
+    render();
+    return;
+  }
+
+  // 'f' triggers cast
+  if (key === 'f' || key === 'F') {
+    game = dispatch(game, { type: 'cast' });
     render();
     return;
   }

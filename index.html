@@ -269,6 +269,7 @@
     <span class="food" id="hud-food"></span>
     <span class="gold" id="hud-gold"></span>
     <span class="equipment" id="hud-equipment"></span>
+    <span class="equipment" id="hud-spell"></span>
     <span class="mode" id="hud-mode"></span>
     <button id="mute-btn" class="hud-btn" title="Toggle sound">&#x1f50a;</button>
     <button id="help-btn" class="hud-btn" title="Show controls help">?</button>
@@ -284,6 +285,7 @@
       <div class="help-row"><span class="help-key">P</span><span class="help-desc">Use food</span></div>
       <div class="help-row"><span class="help-key">. or &gt;</span><span class="help-desc">Interact / descend</span></div>
       <div class="help-row"><span class="help-key">5</span><span class="help-desc">Wait a turn</span></div>
+      <div class="help-row"><span class="help-key">F</span><span class="help-desc">Cast spell</span></div>
       <h3>Toggles</h3>
       <div class="help-row"><span class="help-key">Tab</span><span class="help-desc">Cycle render mode</span></div>
       <div class="help-row"><span class="help-key">M</span><span class="help-desc">Toggle minimap</span></div>
@@ -307,7 +309,7 @@
     <button id="restart-btn">Restart</button>
   </div>
   <script type="module">
-    import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR, EQUIPMENT_TYPES } from './src/game.js';
+    import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR, EQUIPMENT_TYPES, SPELL_TYPES } from './src/game.js';
     import { GLYPHS, GLYPHS_ENHANCED, GLYPHS_ASCII, getRenderMode, toggleRenderMode } from './src/glyphs.js';
     import { initAudio, setVolume, getVolume, playMove, playAttack, playHurt, playPickup, playDescend, playDeath, playVictory } from './src/audio.js';
 
@@ -800,6 +802,14 @@
       }
       document.getElementById('hud-equipment').innerHTML = equipParts.join(' ');
 
+      // Spell HUD
+      const spellEl = document.getElementById('hud-spell');
+      if (game.spell) {
+        spellEl.innerHTML = `<span style="color:#ff6600">\u{1F525}${game.spell.name} x${game.spell.charges}</span>`;
+      } else {
+        spellEl.innerHTML = '<span style="opacity:0.3">Spell: \u2014</span>';
+      }
+
       const modeLabels = { sprite: '[sprite]', emoji: '[emoji]', ascii: '[ASCII]' };
       modeEl.textContent = modeLabels[renderMode];
 
@@ -835,6 +845,7 @@
           ['Damage taken', s.damageTaken],
           ['Gold collected', s.goldCollected],
           ['Idol offerings', s.idolOfferings || 0],
+          ['Spells cast', s.spellsCast || 0],
           ['Food eaten', s.foodUsed],
           ['Steps taken', s.stepsTaken],
         ];
@@ -987,6 +998,27 @@
       }
 
       if (game.gameOver || game.won) return;
+
+      // Cast-pending mode: direction keys cast, anything else cancels
+      if (game.castPending) {
+        e.preventDefault();
+        stopHoldRepeat();
+        const dir = KEY_MAP[e.key];
+        if (dir) {
+          dispatchAndPlay({ type: 'castDir', dir });
+        } else {
+          dispatchAndPlay({ type: 'castCancel' });
+        }
+        return;
+      }
+
+      // 'f' triggers cast
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        stopHoldRepeat();
+        dispatchAndPlay({ type: 'cast' });
+        return;
+      }
 
       const dir = KEY_MAP[e.key];
       if (dir) {
