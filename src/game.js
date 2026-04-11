@@ -31,7 +31,6 @@ export { EQUIPMENT_TYPES };
 const MAX_MESSAGES = 20;
 const WIN_LEVEL = 5;
 const FOOD_HEAL = 10;
-export const IDOL_COST = 25;
 const IDOL_MAXHP_BONUS = 5;
 
 const DEFAULT_STATS = {
@@ -365,16 +364,17 @@ function handleInteract(game) {
   const idolHere = items.find(it => it.x === player.x && it.y === player.y && it.type === 'idol');
 
   if (idolHere) {
-    if (game.inventory.gold < IDOL_COST) {
-      const messages = [...game.messages, `The idol demands ${IDOL_COST} gold. You have ${game.inventory.gold}.`];
+    const cost = player.maxHp;
+    if (game.inventory.gold < cost) {
+      const messages = [...game.messages, `The idol demands ${cost} gold. You have ${game.inventory.gold}.`];
       return { ...game, messages: messages.slice(-MAX_MESSAGES) };
     }
     const newMaxHp = player.maxHp + IDOL_MAXHP_BONUS;
-    const messages = [...game.messages, `You offer ${IDOL_COST} gold to the idol. Your vigor swells. (+${IDOL_MAXHP_BONUS} max HP, fully healed)`];
+    const messages = [...game.messages, `You offer ${cost} gold to the idol. Your vigor swells. (+${IDOL_MAXHP_BONUS} max HP, fully healed)`];
     return {
       ...game,
       player: { ...player, maxHp: newMaxHp, hp: newMaxHp },
-      inventory: { ...game.inventory, gold: game.inventory.gold - IDOL_COST },
+      inventory: { ...game.inventory, gold: game.inventory.gold - cost },
       stats: { ...getStats(game), idolOfferings: getStats(game).idolOfferings + 1 },
       messages: messages.slice(-MAX_MESSAGES),
     };

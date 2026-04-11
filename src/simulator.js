@@ -1,4 +1,4 @@
-import { createGame, dispatch, EQUIPMENT_TYPES, IDOL_COST } from './game.js';
+import { createGame, dispatch, EQUIPMENT_TYPES } from './game.js';
 import { isWalkable } from './map.js';
 
 const MAX_TURNS = 2000;
@@ -67,7 +67,7 @@ function findExploreTarget(game) {
         continue;
       }
       if (it.type === 'idol') {
-        if (inventory.gold >= IDOL_COST) {
+        if (inventory.gold >= player.maxHp) {
           const d = Math.abs(it.x - px) + Math.abs(it.y - py);
           if (d < bestIdolDist) { bestIdolDist = d; bestIdol = it; }
         }
@@ -146,7 +146,7 @@ export function chooseAction(game) {
   // 1.5. Offer at idol if standing on one with enough gold
   if (game.items) {
     const idolHere = game.items.find(it => it.type === 'idol' && it.x === px && it.y === py);
-    if (idolHere && inventory.gold >= IDOL_COST) {
+    if (idolHere && inventory.gold >= player.maxHp) {
       return { type: 'interact' };
     }
   }
@@ -234,7 +234,7 @@ function chooseActionBeeline(game) {
   // Offer at idol if standing on one with enough gold
   if (game.items) {
     const idolHere = game.items.find(it => it.type === 'idol' && it.x === px && it.y === py);
-    if (idolHere && inventory.gold >= IDOL_COST) {
+    if (idolHere && inventory.gold >= player.maxHp) {
       return { type: 'interact' };
     }
   }
@@ -297,7 +297,7 @@ export function runGame(seed) {
     const usefulItems = game.items ? game.items.filter(it => {
       if (it.type === 'food') return true;
       if (it.type === 'gold') return true;
-      if (it.type === 'idol') return game.inventory.gold >= IDOL_COST;
+      if (it.type === 'idol') return game.inventory.gold >= game.player.maxHp;
       const eqDef = EQUIPMENT_TYPES[it.type];
       if (eqDef) {
         const current = game.equipment[eqDef.slot];
