@@ -1,4 +1,4 @@
-import { createGame, dispatch, EQUIPMENT_TYPES } from './game.js';
+import { createGame, dispatch, EQUIPMENT_TYPES, IDOL_COST } from './game.js';
 import { isWalkable } from './map.js';
 
 const MAX_TURNS = 2000;
@@ -50,14 +50,29 @@ function bfs(game, startX, startY, goalFn, walkableFn) {
  * or nearest unrevealed walkable tile in rooms. Returns {x,y} or null.
  */
 function findExploreTarget(game) {
-  const { map, revealed, items, equipment } = game;
-  const px = game.player.x, py = game.player.y;
+  const { map, revealed, items, equipment, inventory, player } = game;
+  const px = player.x, py = player.y;
 
   // Priority 1: nearest useful item by Manhattan distance
   if (items && items.length > 0) {
     let best = null;
     let bestDist = Infinity;
+    let bestIdol = null;
+    let bestIdolDist = Infinity;
+
     for (const it of items) {
+      if (it.type === 'food' || it.type === 'gold') {
+        const d = Math.abs(it.x - px) + Math.abs(it.y - py);
+        if (d < bestDist) { bestDist = d; best = it; }
+        continue;
+      }
+      if (it.type === 'idol') {
+        if (inventory.gold >= IDOL_COST) {
+          const d = Math.abs(it.x - px) + Math.abs(it.y - py);
+          if (d < bestIdolDist) { bestIdolDist = d; bestIdol = it; }
+        }
+        continue;
+      }
       const eqDef = EQUIPMENT_TYPES[it.type];
       if (eqDef) {
         const current = equipment[eqDef.slot];
@@ -66,6 +81,18 @@ function findExploreTarget(game) {
       const d = Math.abs(it.x - px) + Math.abs(it.y - py);
       if (d < bestDist) { bestDist = d; best = it; }
     }
+
+    // Idols: at full HP, only select if closer than (or equal to) best non-idol target
+    if (bestIdol) {
+      if (player.hp < player.maxHp) {
+        // Injured — idol competes on equal footing
+        if (bestIdolDist < bestDist) { bestDist = bestIdolDist; best = bestIdol; }
+      } else {
+        // Full HP — proximity gate: only if idol is at least as close
+        if (bestIdolDist <= bestDist) { bestDist = bestIdolDist; best = bestIdol; }
+      }
+    }
+
     if (best) return { x: best.x, y: best.y };
   }
 
@@ -114,6 +141,14 @@ export function chooseAction(game) {
   // 1. Eat food if HP ≤ 50% and has food
   if (player.hp <= player.maxHp * 0.5 && inventory.food > 0) {
     return { type: 'useFood' };
+  }
+
+  // 1.5. Offer at idol if standing on one with enough gold
+  if (game.items) {
+    const idolHere = game.items.find(it => it.type === 'idol' && it.x === px && it.y === py);
+    if (idolHere && inventory.gold >= IDOL_COST) {
+      return { type: 'interact' };
+    }
   }
 
   // 2. Descend if on stairs and level feels cleared
@@ -196,6 +231,14 @@ function chooseActionBeeline(game) {
     return { type: 'useFood' };
   }
 
+  // Offer at idol if standing on one with enough gold
+  if (game.items) {
+    const idolHere = game.items.find(it => it.type === 'idol' && it.x === px && it.y === py);
+    if (idolHere && inventory.gold >= IDOL_COST) {
+      return { type: 'interact' };
+    }
+  }
+
   // Descend if on stairs
   if (map.tiles[py][px] === '>') {
     return { type: 'descend' };
@@ -252,12 +295,15 @@ export function runGame(seed) {
 
     // Check if there are still useful items on the map
     const usefulItems = game.items ? game.items.filter(it => {
+      if (it.type === 'food') return true;
+      if (it.type === 'gold') return true;
+      if (it.type === 'idol') return game.inventory.gold >= IDOL_COST;
       const eqDef = EQUIPMENT_TYPES[it.type];
       if (eqDef) {
         const current = game.equipment[eqDef.slot];
         return !current || current.bonus < eqDef.bonus;
       }
-      return true; // food
+      return false;
     }) : [];
 
     // Beeline when: stuck (high revisit), too long on level, or no useful items left
