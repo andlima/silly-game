@@ -17,6 +17,7 @@ export const GLYPHS_ENHANCED = {
   helmet:   { char: '\ud83e\ude96', wide: true },         // 🪖
   shield:   { char: '\ud83d\udee1\ufe0f', wide: true },   // 🛡️
   gold:     { char: '\ud83e\ude99', wide: true },         // 🪙
+  idol:     { char: '🗿', wide: true },
 };
 
 // Classic ASCII glyph set — 1-column cells
@@ -35,6 +36,7 @@ export const GLYPHS_ASCII = {
   helmet:   { char: '^', wide: false },
   shield:   { char: ']', wide: false },
   gold:     { char: '$', wide: false },
+  idol:     { char: 'I', wide: false },
 };
 
 // Default to enhanced mode

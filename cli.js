@@ -9,7 +9,7 @@ let game = createGame();
 // ─── Bot protocol ───────────────────────────────────────────────────────────
 
 if (BOT_MODE) {
-  const VALID_ACTIONS = new Set(['move', 'wait', 'useFood', 'descend', 'restart']);
+  const VALID_ACTIONS = new Set(['move', 'wait', 'useFood', 'descend', 'interact', 'restart']);
   const VALID_DIRS = new Set(['n', 's', 'e', 'w']);
 
   let prevMessageCount = 0;
@@ -285,7 +285,7 @@ function render() {
   out += `  ${FG_MAGENTA}Food: ${game.inventory.food}${RESET}`;
   out += `  ${FG_YELLOW}Gold: ${game.inventory.gold}${RESET}`;
   out += `  ${FG_GREY}${modeLabel}${RESET}`;
-  out += `  |  ${FG_GREY}p:food  >/.:descend  Tab:toggle  q:quit${RESET}\n`;
+  out += `  |  ${FG_GREY}p:food  >/.:use  Tab:toggle  q:quit${RESET}\n`;
 
   // Equipment HUD
   const eq = game.equipment;
@@ -315,7 +315,7 @@ function renderHelp() {
   out += `    ${FG_CYAN}Arrow keys / WASD${RESET}  ${FG_GREY}Move${RESET}\n\n`;
   out += `  ${FG_WHITE}Actions${RESET}\n`;
   out += `    ${FG_CYAN}P${RESET}                  ${FG_GREY}Use food${RESET}\n`;
-  out += `    ${FG_CYAN}. or >${RESET}              ${FG_GREY}Descend stairs${RESET}\n`;
+  out += `    ${FG_CYAN}. or >${RESET}              ${FG_GREY}Interact / descend${RESET}\n`;
   out += `    ${FG_CYAN}5${RESET}                  ${FG_GREY}Wait a turn${RESET}\n\n`;
   out += `  ${FG_WHITE}Toggles${RESET}\n`;
   out += `    ${FG_CYAN}Tab${RESET}                ${FG_GREY}Toggle render mode${RESET}\n`;
@@ -331,6 +331,7 @@ function renderStats(out) {
   out += `  ${FG_GREY}Level reached: ${FG_WHITE}${game.level}${RESET}\n`;
   out += `  ${FG_GREY}Monsters slain: ${FG_WHITE}${s.monstersKilled || 0}${RESET}\n`;
   out += `  ${FG_GREY}Gold collected: ${FG_YELLOW}${s.goldCollected || 0}${RESET}\n`;
+  out += `  ${FG_GREY}Idol offerings: ${FG_WHITE}${s.idolOfferings || 0}${RESET}\n`;
   out += `  ${FG_GREY}Steps taken: ${FG_WHITE}${s.stepsTaken || 0}${RESET}\n`;
   return out;
 }
@@ -412,7 +413,7 @@ process.stdin.on('data', (key) => {
   }
 
   if (key === '.' || key === '>') {
-    game = dispatch(game, { type: 'descend' });
+    game = dispatch(game, { type: 'interact' });
     render();
     return;
   }

@@ -58,7 +58,7 @@ export function parseMessageToEvent(msg) {
   if (msg.includes('escape the dungeon')) {
     return { type: 'win' };
   }
-  if (msg === 'There are no stairs here.') {
+  if (msg === 'There are no stairs here.' || msg === 'Nothing to interact with here.') {
     return { type: 'no_stairs' };
   }
   if (msg === 'You have no food.') {

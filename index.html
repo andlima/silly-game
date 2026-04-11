@@ -282,7 +282,7 @@
       <div class="help-row"><span class="help-key">Arrow keys / WASD</span><span class="help-desc">Move</span></div>
       <h3>Actions</h3>
       <div class="help-row"><span class="help-key">P</span><span class="help-desc">Use food</span></div>
-      <div class="help-row"><span class="help-key">. or &gt;</span><span class="help-desc">Descend stairs</span></div>
+      <div class="help-row"><span class="help-key">. or &gt;</span><span class="help-desc">Interact / descend</span></div>
       <div class="help-row"><span class="help-key">5</span><span class="help-desc">Wait a turn</span></div>
       <h3>Toggles</h3>
       <div class="help-row"><span class="help-key">Tab</span><span class="help-desc">Cycle render mode</span></div>
@@ -291,13 +291,13 @@
       <div class="help-row"><span class="help-key">R</span><span class="help-desc">Restart game</span></div>
       <h3>Touch Controls</h3>
       <div class="help-row"><span class="help-key">Tap quadrant</span><span class="help-desc">Move</span></div>
-      <div class="help-row"><span class="help-key">Action buttons</span><span class="help-desc">Food / Descend / Wait</span></div>
+      <div class="help-row"><span class="help-key">Action buttons</span><span class="help-desc">Food / Use / Wait</span></div>
       <div class="help-dismiss">Press ? or Esc to close</div>
     </div>
   </div>
   <div id="action-bar">
     <button id="btn-food">Food</button>
-    <button id="btn-descend">Descend</button>
+    <button id="btn-descend">Use</button>
     <button id="btn-wait">Wait</button>
   </div>
   <div id="overlay">
@@ -395,6 +395,7 @@
 
       // Pre-slice each sprite cell into an offscreen canvas for fast drawImage
       for (const [name, s] of Object.entries(SPRITE_MAP)) {
+        if (!s) continue;
         const offscreen = document.createElement('canvas');
         offscreen.width = cellW;
         offscreen.height = cellH;
@@ -424,6 +425,7 @@
       sword:    { col: 1, row: 2 },
       helmet:   { col: 2, row: 2 },
       shield:   { col: 3, row: 2 },
+      idol:     null,
     };
 
     function drawSprite(name, px, py) {
@@ -832,6 +834,7 @@
           ['Damage dealt', s.damageDealt],
           ['Damage taken', s.damageTaken],
           ['Gold collected', s.goldCollected],
+          ['Idol offerings', s.idolOfferings || 0],
           ['Food eaten', s.foodUsed],
           ['Steps taken', s.stepsTaken],
         ];
@@ -1001,7 +1004,7 @@
       if (e.key === '.' || e.key === '>') {
         e.preventDefault();
         stopHoldRepeat();
-        dispatchAndPlay({ type: 'descend' });
+        dispatchAndPlay({ type: 'interact' });
         return;
       }
 
@@ -1180,7 +1183,7 @@
     document.getElementById('btn-descend').addEventListener('click', () => {
       initAudio(); audioReady = true;
       if (game.gameOver || game.won) return;
-      dispatchAndPlay({ type: 'descend' });
+      dispatchAndPlay({ type: 'interact' });
     });
     document.getElementById('btn-wait').addEventListener('click', () => {
       initAudio(); audioReady = true;

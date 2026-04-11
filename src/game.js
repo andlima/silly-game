@@ -31,10 +31,13 @@ export { EQUIPMENT_TYPES };
 const MAX_MESSAGES = 20;
 const WIN_LEVEL = 5;
 const FOOD_HEAL = 10;
+const IDOL_COST = 25;
+const IDOL_MAXHP_BONUS = 5;
 
 const DEFAULT_STATS = {
   monstersKilled: 0, damageDealt: 0, damageTaken: 0,
   foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
+  idolOfferings: 0,
 };
 
 function getStats(game) {
@@ -58,6 +61,7 @@ export function createGame() {
       stepsTaken: 0,
       causeOfDeath: null,
       goldCollected: 0,
+      idolOfferings: 0,
     },
   });
 }
@@ -69,6 +73,7 @@ function newLevel(state) {
   const items = spawnFood(map, monsters);
   spawnEquipment(map, monsters, items, state.level);
   spawnTreasure(map, monsters, items, state.level);
+  spawnIdol(map, monsters, items, state.level);
   placeStair(map);
 
   // Initialize revealed array (all false) and compute initial FOV
@@ -97,6 +102,7 @@ function newLevel(state) {
     stats: state.stats ? { ...state.stats } : {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
       foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
+      idolOfferings: 0,
     },
   };
 }
@@ -148,6 +154,25 @@ function spawnTreasure(map, monsters, items, level) {
       map.tiles[y][x] !== '>'
     ) {
       items.push({ x, y, type: 'gold', char: '$', color: '#ffcc00', value: 2 * level });
+      break;
+    }
+  }
+}
+
+function spawnIdol(map, monsters, items, level) {
+  if (level < 2 || level > 4) return;
+  const roomIdx = 1 + Math.floor(Math.random() * (map.rooms.length - 1));
+  const room = map.rooms[roomIdx];
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const x = room.x + Math.floor(Math.random() * room.w);
+    const y = room.y + Math.floor(Math.random() * room.h);
+    if (
+      isWalkable(map, x, y) &&
+      !monsters.some(m => m.x === x && m.y === y) &&
+      !items.some(it => it.x === x && it.y === y) &&
+      map.tiles[y][x] !== '>'
+    ) {
+      items.push({ x, y, type: 'idol', char: 'I', color: '#ccaa44' });
       break;
     }
   }
@@ -245,8 +270,9 @@ export function dispatch(game, action) {
     case 'wait':
       next = runMonsterTurns(game);
       break;
+    case 'interact':
     case 'descend':
-      next = handleDescend(game);
+      next = handleInteract(game);
       break;
     case 'useFood':
       next = handleUseFood(game);
@@ -290,6 +316,7 @@ function checkPickup(game) {
   const { player, items } = game;
   const itemHere = items.find(it => it.x === player.x && it.y === player.y);
   if (!itemHere) return game;
+  if (itemHere.type === 'idol') return game;
 
   if (itemHere.type === 'gold') {
     const value = itemHere.value || 0;
@@ -333,10 +360,29 @@ function checkPickup(game) {
   return game;
 }
 
-function handleDescend(game) {
-  const tile = getTile(game.map, game.player.x, game.player.y);
+function handleInteract(game) {
+  const { player, items } = game;
+  const idolHere = items.find(it => it.x === player.x && it.y === player.y && it.type === 'idol');
+
+  if (idolHere) {
+    if (game.inventory.gold < IDOL_COST) {
+      const messages = [...game.messages, `The idol demands ${IDOL_COST} gold. You have ${game.inventory.gold}.`];
+      return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+    }
+    const newMaxHp = player.maxHp + IDOL_MAXHP_BONUS;
+    const messages = [...game.messages, `You offer ${IDOL_COST} gold to the idol. Your vigor swells. (+${IDOL_MAXHP_BONUS} max HP, fully healed)`];
+    return {
+      ...game,
+      player: { ...player, maxHp: newMaxHp, hp: newMaxHp },
+      inventory: { ...game.inventory, gold: game.inventory.gold - IDOL_COST },
+      stats: { ...getStats(game), idolOfferings: getStats(game).idolOfferings + 1 },
+      messages: messages.slice(-MAX_MESSAGES),
+    };
+  }
+
+  const tile = getTile(game.map, player.x, player.y);
   if (tile !== '>') {
-    const messages = [...game.messages, 'There are no stairs here.'];
+    const messages = [...game.messages, 'Nothing to interact with here.'];
     return { ...game, messages: messages.slice(-MAX_MESSAGES) };
   }
 
