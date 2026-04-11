@@ -78,7 +78,7 @@ function makeMonster(overrides = {}) {
 }
 
 // We import dispatch dynamically to use the same ESM module
-const { dispatch, createGame, setRollOverride } = await import('./game.js');
+const { dispatch, createGame, setRollOverride, SPELL_TYPES } = await import('./game.js');
 
 import { beforeEach, afterEach } from 'node:test';
 
@@ -1146,5 +1146,222 @@ describe('spell system', () => {
     assert.ok(next.spell);
     assert.equal(next.spell.type, 'firebolt');
     assert.equal(next.spell.charges, 2);
+  });
+});
+
+describe('SPELL_TYPES has mechanic field', () => {
+  it('all four spell types exist with mechanic field', () => {
+    assert.ok(SPELL_TYPES.firebolt);
+    assert.ok(SPELL_TYPES.lightning);
+    assert.ok(SPELL_TYPES.frost);
+    assert.ok(SPELL_TYPES.whirlwind);
+    assert.equal(SPELL_TYPES.firebolt.mechanic, 'bolt');
+    assert.equal(SPELL_TYPES.lightning.mechanic, 'burst');
+    assert.equal(SPELL_TYPES.frost.mechanic, 'bolt');
+    assert.equal(SPELL_TYPES.whirlwind.mechanic, 'fov_push');
+  });
+});
+
+describe('Lightning Bolt (burst)', () => {
+  beforeEach(() => setRollOverride(() => 0));
+  afterEach(() => setRollOverride(null));
+
+  it('hits multiple enemies within range and misses those outside', () => {
+    // Player at (2,2), monsters at (3,2) dist=1 in range, (4,3) dist=2 in range, (7,2) dist=5 out of range
+    const m1 = makeMonster({ x: 3, y: 2, hp: 20, maxHp: 20, name: 'Rat', type: 'rat' });
+    const m2 = makeMonster({ x: 4, y: 3, hp: 20, maxHp: 20, name: 'Skeleton', type: 'skeleton' });
+    const m3 = makeMonster({ x: 7, y: 2, hp: 20, maxHp: 20, name: 'Bear', type: 'bear' });
+    const game = makeGame({
+      monsters: [m1, m2, m3],
+      spell: { type: 'lightning', name: 'Lightning Bolt', charges: 3 },
+    });
+    const next = dispatch(game, { type: 'cast' });
+    // m1 and m2 should be hit (damage 4 each), m3 should not
+    const hitMonsters = next.monsters.filter(m => m.hp < 20);
+    const unhitMonster = next.monsters.find(m => m.hp === 20);
+    assert.equal(hitMonsters.length, 2);
+    assert.ok(unhitMonster); // m3 at dist 5 is untouched
+    assert.equal(next.spell.charges, 2);
+    assert.ok(next.messages.some(m => m.includes('Lightning Bolt hits')));
+  });
+
+  it('fizzles when no enemies in range', () => {
+    const m1 = makeMonster({ x: 7, y: 5, hp: 20, maxHp: 20 });
+    const game = makeGame({
+      monsters: [m1],
+      spell: { type: 'lightning', name: 'Lightning Bolt', charges: 3 },
+    });
+    const next = dispatch(game, { type: 'cast' });
+    assert.ok(next.messages.some(m => m.includes('crackles but finds no target')));
+    assert.equal(next.spell.charges, 2);
+  });
+
+  it('kills award gold and increment stats', () => {
+    const m1 = makeMonster({ x: 3, y: 2, hp: 3, maxHp: 3, type: 'rat' });
+    const game = makeGame({
+      monsters: [m1],
+      spell: { type: 'lightning', name: 'Lightning Bolt', charges: 3 },
+    });
+    const next = dispatch(game, { type: 'cast' });
+    assert.equal(next.monsters.length, 0);
+    assert.equal(next.stats.monstersKilled, 1);
+    assert.equal(next.stats.spellsCast, 1);
+  });
+});
+
+describe('Frost bolt', () => {
+  beforeEach(() => setRollOverride(() => 0));
+  afterEach(() => setRollOverride(null));
+
+  it('freezes a surviving monster for 3 turns', () => {
+    const monster = makeMonster({ x: 5, y: 2, hp: 20, maxHp: 20, defense: 0 });
+    const game = makeGame({
+      monsters: [monster],
+      spell: { type: 'frost', name: 'Frost', charges: 3 },
+      castPending: true,
+    });
+    const next = dispatch(game, { type: 'castDir', dir: 'e' });
+    // Frost damage = 3, monster survives with 17 hp
+    assert.equal(next.monsters[0].hp, 17);
+    // frozenTurns starts at 3, but runMonsterTurns immediately consumes one turn, so 2 remain
+    assert.equal(next.monsters[0].frozenTurns, 2);
+    assert.ok(next.messages.some(m => m.includes('frozen')));
+  });
+
+  it('frozen monster skips turns and resumes after frozenTurns reaches 0', () => {
+    // Monster adjacent to player, frozen for 2 turns
+    const monster = makeMonster({ x: 3, y: 2, hp: 20, maxHp: 20, attack: 10, defense: 0, frozenTurns: 2 });
+    const game = makeGame({ monsters: [monster] });
+
+    // Wait turn 1: monster is frozen (2->1), player takes no damage
+    const after1 = dispatch(game, { type: 'wait' });
+    assert.equal(after1.player.hp, 30);
+    assert.equal(after1.monsters[0].frozenTurns, 1);
+
+    // Wait turn 2: monster is frozen (1->0), player takes no damage
+    const after2 = dispatch(after1, { type: 'wait' });
+    assert.equal(after2.player.hp, 30);
+    assert.equal(after2.monsters[0].frozenTurns, 0);
+
+    // Wait turn 3: monster is no longer frozen, attacks player
+    const after3 = dispatch(after2, { type: 'wait' });
+    assert.ok(after3.player.hp < 30, 'Monster should attack after thawing');
+  });
+});
+
+describe('Whirlwind (fov_push)', () => {
+  beforeEach(() => setRollOverride(() => 0));
+  afterEach(() => setRollOverride(null));
+
+  it('pushes enemies away from player and deals damage', () => {
+    // Player at (2,2), monster at (3,2) — should push east
+    const monster = makeMonster({ x: 3, y: 2, hp: 20, maxHp: 20 });
+    const game = makeGame({
+      monsters: [monster],
+      spell: { type: 'whirlwind', name: 'Whirlwind', charges: 3 },
+    });
+    const next = dispatch(game, { type: 'cast' });
+    // Monster should have been pushed east and taken 2 damage
+    const m = next.monsters[0];
+    assert.ok(m.x > 3, 'Monster should have been pushed east');
+    assert.equal(m.hp, 18); // 20 - 2
+    assert.ok(next.messages.some(msg => msg.includes('Whirlwind hits')));
+  });
+
+  it('wall collision deals bonus damage', () => {
+    // Create a narrow corridor: floor at (1,1) (2,1) (3,1), walls everywhere else
+    // Player at (2,1), monster at (3,1) — wall at (4,1) so monster can't move
+    const floor = [[1,1],[2,1],[3,1]];
+    const map = makeMap(5, 3, floor);
+    const monster = makeMonster({ x: 3, y: 1, hp: 20, maxHp: 20 });
+    const game = makeGame({
+      map,
+      player: { x: 2, y: 1, hp: 30, maxHp: 30, attack: 5, defense: 2 },
+      monsters: [monster],
+      spell: { type: 'whirlwind', name: 'Whirlwind', charges: 3 },
+    });
+    const next = dispatch(game, { type: 'cast' });
+    // Monster can't move (wall behind), so gets wall bonus: 2 + 2 = 4 damage
+    assert.equal(next.monsters[0].hp, 16);
+    assert.ok(next.messages.some(m => m.includes('slams into the wall')));
+  });
+
+  it('no wall bonus when blocked by another monster', () => {
+    // Player at (2,1), monsterA at (3,1), monsterB at (4,1), wall at (5,1)
+    // monsterA is blocked by monsterB — should NOT get wall bonus
+    const floor = [[1,1],[2,1],[3,1],[4,1]];
+    const map = makeMap(6, 3, floor);
+    const monsterA = makeMonster({ x: 3, y: 1, hp: 20, maxHp: 20 });
+    const monsterB = makeMonster({ x: 4, y: 1, hp: 20, maxHp: 20 });
+    const game = makeGame({
+      map,
+      player: { x: 2, y: 1, hp: 30, maxHp: 30, attack: 5, defense: 2 },
+      monsters: [monsterA, monsterB],
+      spell: { type: 'whirlwind', name: 'Whirlwind', charges: 3 },
+    });
+    const next = dispatch(game, { type: 'cast' });
+    // monsterB is against wall — gets wall bonus (2 + 2 = 4 damage => hp 16)
+    // monsterA is blocked by monsterB — only base damage (2 damage => hp 18)
+    const mA = next.monsters.find(m => m.hp === 18);
+    const mB = next.monsters.find(m => m.hp === 16);
+    assert.ok(mA, 'Monster blocked by another monster should take only base damage (hp 18)');
+    assert.ok(mB, 'Monster blocked by wall should take wall bonus damage (hp 16)');
+    assert.ok(!next.messages.filter(m => m.includes('slams into the wall')).length || next.messages.filter(m => m.includes('slams into the wall')).length === 1,
+      'Only the wall-blocked monster should slam into the wall');
+  });
+
+  it('fizzles with no enemies in FOV', () => {
+    const game = makeGame({
+      monsters: [],
+      spell: { type: 'whirlwind', name: 'Whirlwind', charges: 3 },
+    });
+    const next = dispatch(game, { type: 'cast' });
+    assert.ok(next.messages.some(m => m.includes('howls but finds nothing to push')));
+    assert.equal(next.spell.charges, 2);
+  });
+});
+
+describe('scroll pickup replacement', () => {
+  beforeEach(() => setRollOverride(() => 0));
+  afterEach(() => setRollOverride(null));
+
+  it('picking up a scroll of a different type replaces the current spell', () => {
+    const scroll = { x: 3, y: 2, type: 'scroll', spellType: 'frost', char: '*', color: '#00ccff' };
+    const game = makeGame({
+      items: [scroll],
+      spell: { type: 'firebolt', name: 'Firebolt', charges: 2 },
+    });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.spell.type, 'frost');
+    assert.equal(next.spell.name, 'Frost');
+    assert.equal(next.spell.charges, 3);
+    assert.equal(next.items.length, 0);
+    assert.ok(next.messages.some(m => m.includes('discard') && m.includes('Firebolt') && m.includes('Frost')));
+  });
+});
+
+describe('scroll spawn randomization', () => {
+  it('produces varied spell types over many level-2 games', () => {
+    const seenTypes = new Set();
+    // Create level-1 games, place stair at player, descend to level 2
+    // which invokes spawnScrolls with level >= 2
+    for (let i = 0; i < 300; i++) {
+      const game = createGame();
+      // Place stair under player to enable descend
+      game.map.tiles[game.player.y][game.player.x] = '>';
+      const level2 = dispatch(game, { type: 'descend' });
+      for (const item of level2.items) {
+        if (item.type === 'scroll') {
+          seenTypes.add(item.spellType);
+        }
+      }
+    }
+    // With 300 iterations and 50% spawn chance, we should see multiple types
+    // spawnScrolls picks uniformly from 4 spell types
+    assert.ok(seenTypes.size >= 2, `Expected at least 2 spell types, got ${seenTypes.size}: ${[...seenTypes]}`);
+    // Verify all types are valid SPELL_TYPES keys
+    for (const t of seenTypes) {
+      assert.ok(SPELL_TYPES[t], `Unknown spell type: ${t}`);
+    }
   });
 });

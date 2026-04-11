@@ -591,10 +591,15 @@
           drawSprite('player', px, py);
         } else if (cell.monster) {
           drawSprite(cell.monster.type, px, py);
+          if (cell.monster.frozenTurns > 0) {
+            ctx.fillStyle = 'rgba(136, 204, 255, 0.4)';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
         } else if (cell.item) {
           if (!drawSprite(cell.item.type, px, py)) {
             // Text fallback for items without sprites (e.g. gold)
-            const glyph = GLYPHS[cell.item.type];
+            const glyphKey = cell.item.type === 'scroll' ? cell.item.spellType : cell.item.type;
+            const glyph = GLYPHS[glyphKey] || GLYPHS[cell.item.type];
             const cx = px + TILE_SIZE / 2;
             const cy = py + TILE_SIZE / 2;
             ctx.textAlign = 'center';
@@ -660,17 +665,23 @@
             ctx.fillStyle = scaleColor(COLORS.player, b);
             ctx.fillText(GLYPHS.player.char, cx, cy);
           } else if (cell.monster) {
+            const monsterColor = cell.monster.frozenTurns > 0 ? '#88ccff' : cell.monster.color;
             const glyph = GLYPHS[cell.monster.type];
             if (glyph && glyph.wide) {
               ctx.font = `${FONT_SIZE - 2}px ${EMOJI_FONT}`;
               ctx.fillText(glyph.char, cx, cy);
+              if (cell.monster.frozenTurns > 0) {
+                ctx.fillStyle = 'rgba(136, 204, 255, 0.4)';
+                ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+              }
             } else {
               ctx.font = `${FONT_SIZE}px monospace`;
-              ctx.fillStyle = scaleColor(cell.monster.color, Math.min(1, b * 1.15));
+              ctx.fillStyle = scaleColor(monsterColor, Math.min(1, b * 1.15));
               ctx.fillText((glyph || { char: cell.monster.char }).char, cx, cy);
             }
           } else if (cell.item) {
-            const glyph = GLYPHS[cell.item.type];
+            const glyphKey = cell.item.type === 'scroll' ? cell.item.spellType : cell.item.type;
+            const glyph = GLYPHS[glyphKey] || GLYPHS[cell.item.type];
             if (glyph && glyph.wide) {
               ctx.font = `${FONT_SIZE - 2}px ${EMOJI_FONT}`;
               ctx.fillText(glyph.char, cx, cy);
@@ -805,7 +816,10 @@
       // Spell HUD
       const spellEl = document.getElementById('hud-spell');
       if (game.spell) {
-        spellEl.innerHTML = `<span style="color:#ff6600">\u{1F525}${game.spell.name} x${game.spell.charges}</span>`;
+        const spellDef = SPELL_TYPES[game.spell.type];
+        const spellGlyph = GLYPHS_ENHANCED[game.spell.type] || GLYPHS_ENHANCED.firebolt;
+        const spellColor = spellDef ? spellDef.color : '#ff6600';
+        spellEl.innerHTML = `<span style="color:${spellColor}">${spellGlyph.char}${game.spell.name} x${game.spell.charges}</span>`;
       } else {
         spellEl.innerHTML = '<span style="opacity:0.3">Spell: \u2014</span>';
       }
