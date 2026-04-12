@@ -214,6 +214,12 @@
       font-size: 12px;
       color: #666;
     }
+    .help-version {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #555;
+      text-align: center;
+    }
 
     /* First-load hint */
     #help-hint {
@@ -295,6 +301,7 @@
       <div class="help-row"><span class="help-key">Tap quadrant</span><span class="help-desc">Move</span></div>
       <div class="help-row"><span class="help-key">Action buttons</span><span class="help-desc">Food / Use / Wait</span></div>
       <div class="help-dismiss">Press ? or Esc to close</div>
+      <div class="help-version" id="help-version"></div>
     </div>
   </div>
   <div id="action-bar">
@@ -312,6 +319,8 @@
     import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR, EQUIPMENT_TYPES, SPELL_TYPES } from './src/game.js';
     import { GLYPHS, GLYPHS_ENHANCED, GLYPHS_ASCII, getRenderMode, toggleRenderMode } from './src/glyphs.js';
     import { initAudio, setVolume, getVolume, playMove, playAttack, playHurt, playPickup, playDescend, playDeath, playVictory } from './src/audio.js';
+    import { VERSION } from './src/version.js';
+    document.getElementById('help-version').textContent = VERSION;
 
     const TILE_SIZE = 40;
     const FONT_SIZE = 32;

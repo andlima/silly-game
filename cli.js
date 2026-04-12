@@ -1,6 +1,7 @@
 import { createGame, dispatch, getVisibleTiles, FLOOR, WALL, STAIR } from './src/game.js';
 import { GLYPHS, GLYPHS_ASCII, toggleRenderMode, getRenderMode } from './src/glyphs.js';
 import { buildState as _buildState } from './src/bot.js';
+import { VERSION } from './src/version.js';
 
 const BOT_MODE = process.argv.includes('--bot');
 
@@ -323,7 +324,8 @@ function renderHelp() {
   out += `    ${FG_CYAN}Tab${RESET}                ${FG_GREY}Toggle render mode${RESET}\n`;
   out += `    ${FG_CYAN}R${RESET}                  ${FG_GREY}Restart game${RESET}\n`;
   out += `    ${FG_CYAN}Q${RESET}                  ${FG_GREY}Quit${RESET}\n\n`;
-  out += `  ${FG_GREY}Press any key to return to game${RESET}\n`;
+  out += `  ${FG_GREY}Press any key to return to game${RESET}\n\n`;
+  out += `  \x1b[2m${VERSION}\x1b[0m\n`;
   process.stdout.write(out);
 }
 
