@@ -867,6 +867,7 @@
           ['Damage dealt', s.damageDealt],
           ['Damage taken', s.damageTaken],
           ['Gold collected', s.goldCollected],
+          ['Gold spent', s.goldSpent || 0],
           ['Idol offerings', s.idolOfferings || 0],
           ['Spells cast', s.spellsCast || 0],
           ['Food eaten', s.foodUsed],
@@ -1021,6 +1022,18 @@
       }
 
       if (game.gameOver || game.won) return;
+
+      // Shop-pending mode: 1/2/3 buys; any other key closes the shop
+      if (game.shopPending) {
+        e.preventDefault();
+        stopHoldRepeat();
+        if (e.key === '1' || e.key === '2' || e.key === '3') {
+          dispatchAndPlay({ type: 'shopBuy', slot: Number(e.key) - 1 });
+        } else {
+          dispatchAndPlay({ type: 'shopClose' });
+        }
+        return;
+      }
 
       // Cast-pending mode: direction keys cast, anything else cancels
       if (game.castPending) {

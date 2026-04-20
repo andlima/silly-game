@@ -54,6 +54,8 @@ function makeGame(overrides = {}) {
     equipment: overrides.equipment || { weapon: null, helmet: null, shield: null },
     spell: overrides.spell !== undefined ? overrides.spell : null,
     castPending: overrides.castPending || false,
+    shopPending: overrides.shopPending || false,
+    shopItems: overrides.shopItems !== undefined ? overrides.shopItems : null,
     level: overrides.level || 1,
     messages: overrides.messages || [],
     gameOver: overrides.gameOver || false,
@@ -63,7 +65,7 @@ function makeGame(overrides = {}) {
     stats: {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
       foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-      idolOfferings: 0, spellsCast: 0,
+      idolOfferings: 0, spellsCast: 0, goldSpent: 0,
       ...overrides.stats,
     },
   };
@@ -1389,6 +1391,305 @@ describe('scroll pickup replacement', () => {
     assert.equal(next.spell.charges, 3);
     assert.equal(next.items.length, 0);
     assert.ok(next.messages.some(m => m.includes('discard') && m.includes('Firebolt') && m.includes('Frost')));
+  });
+});
+
+describe('merchant spawn', () => {
+  it('never spawns on level 1', () => {
+    for (let i = 0; i < 50; i++) {
+      const g = createGame();
+      const merchants = g.items.filter(it => it.type === 'merchant');
+      assert.equal(merchants.length, 0, `No merchant should spawn on level 1 (iter ${i})`);
+    }
+  });
+
+  it('never spawns on level 5', () => {
+    for (let i = 0; i < 20; i++) {
+      let g = createGame();
+      for (let lvl = 1; lvl < 5; lvl++) {
+        g.map.tiles[g.player.y][g.player.x] = '>';
+        g = dispatch(g, { type: 'descend' });
+      }
+      assert.equal(g.level, 5);
+      const merchants = g.items.filter(it => it.type === 'merchant');
+      assert.equal(merchants.length, 0, `No merchant on level 5 (iter ${i})`);
+    }
+  });
+
+  it('at most one merchant per level on levels 2-4', () => {
+    for (let i = 0; i < 60; i++) {
+      let g = createGame();
+      g.map.tiles[g.player.y][g.player.x] = '>';
+      g = dispatch(g, { type: 'descend' });
+      const merchants = g.items.filter(it => it.type === 'merchant');
+      assert.ok(merchants.length <= 1, `At most one merchant (got ${merchants.length})`);
+    }
+  });
+
+  it('probability gate: sometimes spawns and sometimes does not on level 2', () => {
+    let sawMerchant = 0;
+    let sawNoMerchant = 0;
+    for (let i = 0; i < 200; i++) {
+      let g = createGame();
+      g.map.tiles[g.player.y][g.player.x] = '>';
+      g = dispatch(g, { type: 'descend' });
+      const merchants = g.items.filter(it => it.type === 'merchant');
+      if (merchants.length > 0) sawMerchant++;
+      else sawNoMerchant++;
+    }
+    assert.ok(sawMerchant > 20, `Expected some merchants (got ${sawMerchant}/200)`);
+    assert.ok(sawNoMerchant > 20, `Expected some runs without merchants (got ${sawNoMerchant}/200)`);
+  });
+
+  it('stock has exactly three entries with expected composition', () => {
+    let checked = 0;
+    for (let i = 0; i < 100 && checked < 10; i++) {
+      let g = createGame();
+      g.map.tiles[g.player.y][g.player.x] = '>';
+      g = dispatch(g, { type: 'descend' });
+      const merchant = g.items.find(it => it.type === 'merchant');
+      if (!merchant) continue;
+      assert.ok(Array.isArray(merchant.stock));
+      assert.equal(merchant.stock.length, 3);
+      assert.equal(merchant.stock[0].kind, 'food');
+      assert.equal(merchant.stock[0].price, 3);
+      assert.ok(['throwing_dagger', 'equipment'].includes(merchant.stock[1].kind));
+      assert.equal(merchant.stock[2].kind, 'scroll');
+      assert.equal(merchant.stock[2].price, 8);
+      assert.ok(SPELL_TYPES[merchant.stock[2].subtype]);
+      checked++;
+    }
+    assert.ok(checked > 0, 'Expected at least one merchant spawn across 100 iterations');
+  });
+});
+
+describe('merchant shop', () => {
+  function makeMerchantStock() {
+    return [
+      { kind: 'food', price: 3 },
+      { kind: 'equipment', subtype: 'dagger', price: 5 },
+      { kind: 'scroll', subtype: 'firebolt', price: 8 },
+    ];
+  }
+  function makeMerchant(stock) {
+    return { x: 2, y: 2, type: 'merchant', stock, char: 'M', color: '#ffdd66' };
+  }
+
+  it('walking onto merchant does not auto-pick it up', () => {
+    const merchant = { ...makeMerchant(makeMerchantStock()), x: 3, y: 2 };
+    const game = makeGame({ items: [merchant] });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.items.length, 1);
+    assert.equal(next.items[0].type, 'merchant');
+    assert.ok(!next.messages.some(m => m.includes('pick up')));
+  });
+
+  it('interact on merchant opens the shop with menu lines and no monster turn', () => {
+    const merchant = makeMerchant(makeMerchantStock());
+    const monster = makeMonster({ x: 3, y: 2, attack: 4 });
+    const game = makeGame({ items: [merchant], monsters: [monster] });
+    const next = dispatch(game, { type: 'interact' });
+    assert.equal(next.shopPending, true);
+    assert.ok(Array.isArray(next.shopItems));
+    assert.equal(next.shopItems.length, 3);
+    assert.equal(next.player.hp, 30, 'Monster must not attack while shop opens');
+    assert.ok(next.messages.some(m => m.includes("What'll it be?")));
+    assert.ok(next.messages.some(m => m.includes('Food')));
+    assert.ok(next.messages.some(m => m.includes('Firebolt scroll')));
+  });
+
+  it('shopBuy on food with enough gold deducts, applies, marks slot null, and bumps goldSpent', () => {
+    const stock = makeMerchantStock();
+    const merchant = makeMerchant(stock);
+    const game = makeGame({
+      items: [merchant],
+      inventory: { food: 0, gold: 20 },
+      shopPending: true,
+      shopItems: stock,
+    });
+    const next = dispatch(game, { type: 'shopBuy', slot: 0 });
+    assert.equal(next.inventory.gold, 17);
+    assert.equal(next.inventory.food, 1);
+    assert.equal(next.shopPending, true);
+    assert.equal(next.stats.goldSpent, 3);
+    const merchantAfter = next.items.find(it => it.type === 'merchant');
+    assert.equal(merchantAfter.stock[0], null);
+    assert.equal(next.shopItems[0], null);
+  });
+
+  it('shopBuy with insufficient gold stays in shop and keeps slot', () => {
+    const stock = makeMerchantStock();
+    const merchant = makeMerchant(stock);
+    const game = makeGame({
+      items: [merchant],
+      inventory: { food: 0, gold: 2 },
+      shopPending: true,
+      shopItems: stock,
+    });
+    const next = dispatch(game, { type: 'shopBuy', slot: 0 });
+    assert.equal(next.inventory.gold, 2);
+    assert.equal(next.inventory.food, 0);
+    assert.equal(next.shopPending, true);
+    assert.ok(next.messages.some(m => m.includes('Not enough gold')));
+    const merchantAfter = next.items.find(it => it.type === 'merchant');
+    assert.notEqual(merchantAfter.stock[0], null);
+    assert.equal(next.stats.goldSpent, 0);
+  });
+
+  it('shopBuy on a sold-out slot is a no-op', () => {
+    const stock = [null, makeMerchantStock()[1], makeMerchantStock()[2]];
+    const merchant = makeMerchant(stock);
+    const game = makeGame({
+      items: [merchant],
+      inventory: { gold: 20 },
+      shopPending: true,
+      shopItems: stock,
+    });
+    const next = dispatch(game, { type: 'shopBuy', slot: 0 });
+    assert.equal(next.inventory.gold, 20);
+    assert.equal(next.shopPending, true);
+    assert.equal(next.stats.goldSpent, 0);
+  });
+
+  it('shopBuy equipment that is not strictly better refunds and keeps slot available', () => {
+    const stock = makeMerchantStock();
+    const merchant = makeMerchant(stock);
+    const game = makeGame({
+      items: [merchant],
+      inventory: { gold: 20 },
+      equipment: { weapon: { type: 'sword', name: 'Sword', bonus: 4, stat: 'attack' }, helmet: null, shield: null },
+      shopPending: true,
+      shopItems: stock,
+    });
+    const next = dispatch(game, { type: 'shopBuy', slot: 1 });
+    assert.equal(next.inventory.gold, 20, 'Gold refunded');
+    assert.equal(next.equipment.weapon.type, 'sword');
+    const merchantAfter = next.items.find(it => it.type === 'merchant');
+    assert.notEqual(merchantAfter.stock[1], null, 'Slot remains available');
+    assert.ok(next.messages.some(m => m.includes('refund')));
+    assert.equal(next.stats.goldSpent, 0);
+  });
+
+  it('shopBuy equipment that is strictly better equips it and marks sold-out', () => {
+    const stock = [
+      { kind: 'food', price: 3 },
+      { kind: 'equipment', subtype: 'sword', price: 12 },
+      { kind: 'scroll', subtype: 'firebolt', price: 8 },
+    ];
+    const merchant = makeMerchant(stock);
+    const game = makeGame({
+      items: [merchant],
+      inventory: { gold: 20 },
+      equipment: { weapon: { type: 'dagger', name: 'Dagger', bonus: 2, stat: 'attack' }, helmet: null, shield: null },
+      shopPending: true,
+      shopItems: stock,
+    });
+    const next = dispatch(game, { type: 'shopBuy', slot: 1 });
+    assert.equal(next.inventory.gold, 8);
+    assert.equal(next.equipment.weapon.type, 'sword');
+    assert.equal(next.equipment.weapon.bonus, 4);
+    const merchantAfter = next.items.find(it => it.type === 'merchant');
+    assert.equal(merchantAfter.stock[1], null);
+    assert.equal(next.stats.goldSpent, 12);
+  });
+
+  it('shopBuy scroll into empty spell slot equips the scroll', () => {
+    const stock = makeMerchantStock();
+    const merchant = makeMerchant(stock);
+    const game = makeGame({
+      items: [merchant],
+      inventory: { gold: 20 },
+      spell: null,
+      shopPending: true,
+      shopItems: stock,
+    });
+    const next = dispatch(game, { type: 'shopBuy', slot: 2 });
+    assert.equal(next.inventory.gold, 12);
+    assert.ok(next.spell);
+    assert.equal(next.spell.type, 'firebolt');
+    assert.equal(next.spell.charges, 3);
+    const merchantAfter = next.items.find(it => it.type === 'merchant');
+    assert.equal(merchantAfter.stock[2], null);
+    assert.equal(next.stats.goldSpent, 8);
+  });
+
+  it('shopBuy scroll when already holding different spell replaces it', () => {
+    const stock = makeMerchantStock();
+    const merchant = makeMerchant(stock);
+    const game = makeGame({
+      items: [merchant],
+      inventory: { gold: 20 },
+      spell: { type: 'frost', name: 'Frost', charges: 1 },
+      shopPending: true,
+      shopItems: stock,
+    });
+    const next = dispatch(game, { type: 'shopBuy', slot: 2 });
+    assert.equal(next.spell.type, 'firebolt');
+    assert.equal(next.spell.charges, 3);
+    assert.equal(next.inventory.gold, 12);
+    assert.ok(next.messages.some(m => m.includes('discard') && m.includes('Frost')));
+  });
+
+  it('shopClose clears shop state and does not consume a turn', () => {
+    const stock = makeMerchantStock();
+    const merchant = makeMerchant(stock);
+    const monster = makeMonster({ x: 3, y: 2, attack: 4 });
+    const game = makeGame({
+      items: [merchant],
+      monsters: [monster],
+      shopPending: true,
+      shopItems: stock,
+    });
+    const next = dispatch(game, { type: 'shopClose' });
+    assert.equal(next.shopPending, false);
+    assert.equal(next.shopItems, null);
+    assert.equal(next.player.hp, 30, 'Monster must not attack on shopClose');
+    assert.ok(next.messages.some(m => m.includes('leave the merchant')));
+  });
+
+  it('shopBuy and shopClose never run monster turns', () => {
+    const stock = makeMerchantStock();
+    const merchant = makeMerchant(stock);
+    const monster = makeMonster({ x: 3, y: 2, attack: 4 });
+    const game = makeGame({
+      items: [merchant],
+      monsters: [monster],
+      inventory: { gold: 20 },
+      shopPending: true,
+      shopItems: stock,
+    });
+    let g = dispatch(game, { type: 'shopBuy', slot: 0 });
+    assert.equal(g.player.hp, 30);
+    g = dispatch(g, { type: 'shopBuy', slot: 0 }); // sold-out no-op
+    assert.equal(g.player.hp, 30);
+    g = dispatch(g, { type: 'shopClose' });
+    assert.equal(g.player.hp, 30);
+  });
+
+  it('newLevel resets shop state (shopPending false after descend)', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({
+      map, level: 1,
+      shopPending: true,
+      shopItems: makeMerchantStock(),
+    });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.level, 2);
+    assert.equal(next.shopPending, false);
+    assert.ok(!next.shopItems || next.shopItems.length === 0);
+  });
+
+  it('goldSpent is initialised to 0 in createGame', () => {
+    const game = createGame();
+    assert.equal(game.stats.goldSpent, 0);
   });
 });
 

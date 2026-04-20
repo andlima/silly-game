@@ -18,6 +18,7 @@ export const GLYPHS_ENHANCED = {
   shield:   { char: '\ud83d\udee1\ufe0f', wide: true },   // 🛡️
   gold:     { char: '\ud83e\ude99', wide: true },         // 🪙
   idol:     { char: '🗿', wide: true },
+  merchant: { char: '\ud83e\uddd4', wide: true },    // 🧔
   princess: { char: '\ud83d\udc78', wide: true },    // 👸
   firebolt:  { char: '🔥', wide: true },
   lightning: { char: '⚡', wide: true },
@@ -43,6 +44,7 @@ export const GLYPHS_ASCII = {
   shield:   { char: ']', wide: false },
   gold:     { char: '$', wide: false },
   idol:     { char: 'I', wide: false },
+  merchant: { char: 'M', wide: false },
   princess: { char: 'P', wide: false },
   firebolt:  { char: '~', wide: false },
   lightning: { char: '*', wide: false },

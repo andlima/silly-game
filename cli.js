@@ -154,6 +154,7 @@ const EQUIPMENT_COLORS = {
   shield: FG_CYAN,
   scroll: FG_RED,
   princess: fg256(212),
+  merchant: fg256(221),
 };
 
 const KEY_MAP = {
@@ -321,6 +322,7 @@ function renderHelp() {
   out += `    ${FG_CYAN}P${RESET}                  ${FG_GREY}Use food${RESET}\n`;
   out += `    ${FG_CYAN}. or >${RESET}              ${FG_GREY}Interact / descend${RESET}\n`;
   out += `    ${FG_CYAN}5${RESET}                  ${FG_GREY}Wait a turn${RESET}\n\n`;
+  out += `  ${FG_GREY}Walk onto a merchant (M) and press . to shop${RESET}\n\n`;
   out += `  ${FG_WHITE}Toggles${RESET}\n`;
   out += `    ${FG_CYAN}Tab${RESET}                ${FG_GREY}Toggle render mode${RESET}\n`;
   out += `    ${FG_CYAN}R${RESET}                  ${FG_GREY}Restart game${RESET}\n`;
@@ -336,6 +338,7 @@ function renderStats(out) {
   out += `  ${FG_GREY}Level reached: ${FG_WHITE}${game.level}${RESET}\n`;
   out += `  ${FG_GREY}Monsters slain: ${FG_WHITE}${s.monstersKilled || 0}${RESET}\n`;
   out += `  ${FG_GREY}Gold collected: ${FG_YELLOW}${s.goldCollected || 0}${RESET}\n`;
+  out += `  ${FG_GREY}Gold spent: ${FG_YELLOW}${s.goldSpent || 0}${RESET}\n`;
   out += `  ${FG_GREY}Idol offerings: ${FG_WHITE}${s.idolOfferings || 0}${RESET}\n`;
   out += `  ${FG_GREY}Spells cast: ${FG_WHITE}${s.spellsCast || 0}${RESET}\n`;
   out += `  ${FG_GREY}Steps taken: ${FG_WHITE}${s.stepsTaken || 0}${RESET}\n`;
@@ -407,6 +410,17 @@ process.stdin.on('data', (key) => {
   // Tab key toggles render mode
   if (key === '\t') {
     toggleRenderMode();
+    render();
+    return;
+  }
+
+  // Shop-pending mode: 1/2/3 buys; any other key closes the shop
+  if (game.shopPending) {
+    if (key === '1' || key === '2' || key === '3') {
+      game = dispatch(game, { type: 'shopBuy', slot: Number(key) - 1 });
+    } else {
+      game = dispatch(game, { type: 'shopClose' });
+    }
     render();
     return;
   }
