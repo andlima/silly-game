@@ -13,6 +13,7 @@ export const GLYPHS_ENHANCED = {
   dragon:   { char: '\ud83d\udc09', wide: true },    // 🐉
   food:     { char: '\ud83c\udf4e', wide: true },    // 🍎
   dagger:   { char: '\ud83d\udde1\ufe0f', wide: true },  // 🗡️
+  throwing_dagger: { char: '\ud83d\udd2a', wide: true },  // 🔪
   sword:    { char: '\u2694\ufe0f', wide: true },         // ⚔️
   helmet:   { char: '\ud83e\ude96', wide: true },         // 🪖
   shield:   { char: '\ud83d\udee1\ufe0f', wide: true },   // 🛡️
@@ -38,6 +39,7 @@ export const GLYPHS_ASCII = {
   dragon:   { char: 'd', wide: false },
   food:     { char: '%', wide: false },
   dagger:   { char: '|', wide: false },
+  throwing_dagger: { char: '-', wide: false },
   sword:    { char: '/', wide: false },
   helmet:   { char: '^', wide: false },
   shield:   { char: ']', wide: false },
