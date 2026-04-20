@@ -462,20 +462,12 @@ describe('stairs and levels', () => {
     assert.ok(next.messages.some(m => m.includes('level 2')));
   });
 
-  it('descend at level 5 triggers win', () => {
-    const floor = [];
-    for (let y = 1; y <= 5; y++)
-      for (let x = 1; x <= 8; x++)
-        floor.push([x, y]);
-    const map = makeMap(10, 7, floor, [
-      { x: 1, y: 1, w: 3, h: 3 },
-      { x: 5, y: 1, w: 3, h: 3 },
-    ]);
-    map.tiles[2][2] = STAIR;
-    const game = makeGame({ map, level: 5 });
-    const next = dispatch(game, { type: 'descend' });
+  it('interact on princess at level 5 triggers win', () => {
+    const princess = { x: 2, y: 2, type: 'princess', char: 'P', color: '#ff88cc' };
+    const game = makeGame({ items: [princess], level: 5 });
+    const next = dispatch(game, { type: 'interact' });
     assert.equal(next.won, true);
-    assert.ok(next.messages.some(m => m.includes('escape')));
+    assert.ok(next.messages.some(m => m.includes('rescue the princess')));
   });
 
   it('inventory persists across levels', () => {
@@ -1146,6 +1138,66 @@ describe('spell system', () => {
     assert.ok(next.spell);
     assert.equal(next.spell.type, 'firebolt');
     assert.equal(next.spell.charges, 2);
+  });
+});
+
+describe('rescue the princess', () => {
+  it('level 5 newLevel places a princess item and no staircase tile', () => {
+    const game = createGame();
+    // Advance from level 1 through 4 using manual stairs
+    let g = game;
+    for (let lvl = 1; lvl < 5; lvl++) {
+      g.map.tiles[g.player.y][g.player.x] = '>';
+      g = dispatch(g, { type: 'descend' });
+    }
+    assert.equal(g.level, 5);
+    const princesses = g.items.filter(it => it.type === 'princess');
+    assert.equal(princesses.length, 1, 'Exactly one princess should spawn on level 5');
+    let hasStair = false;
+    for (let y = 0; y < g.map.height; y++) {
+      for (let x = 0; x < g.map.width; x++) {
+        if (g.map.tiles[y][x] === '>') hasStair = true;
+      }
+    }
+    assert.equal(hasStair, false, 'Level 5 should not have a staircase tile');
+  });
+
+  it('levels 1-4 still place a staircase and no princess', () => {
+    for (let lvl = 1; lvl <= 4; lvl++) {
+      let g = createGame();
+      while (g.level < lvl) {
+        g.map.tiles[g.player.y][g.player.x] = '>';
+        g = dispatch(g, { type: 'descend' });
+      }
+      assert.equal(g.level, lvl);
+      const princesses = g.items.filter(it => it.type === 'princess');
+      assert.equal(princesses.length, 0, `Level ${lvl} should have no princess`);
+      let hasStair = false;
+      for (let y = 0; y < g.map.height; y++) {
+        for (let x = 0; x < g.map.width; x++) {
+          if (g.map.tiles[y][x] === '>') hasStair = true;
+        }
+      }
+      assert.equal(hasStair, true, `Level ${lvl} should have a stair tile`);
+    }
+  });
+
+  it('interacting while standing on the princess sets won=true and adds rescue message', () => {
+    const princess = { x: 2, y: 2, type: 'princess', char: 'P', color: '#ff88cc' };
+    const game = makeGame({ items: [princess], level: 5 });
+    const next = dispatch(game, { type: 'interact' });
+    assert.equal(next.won, true);
+    assert.ok(next.messages.some(m => m.includes('rescue the princess')));
+  });
+
+  it('princess does not auto-pickup when walked onto', () => {
+    const princess = { x: 3, y: 2, type: 'princess', char: 'P', color: '#ff88cc' };
+    const game = makeGame({ items: [princess], level: 5 });
+    const next = dispatch(game, { type: 'move', dir: 'e' }); // walk east to 3,2
+    assert.equal(next.items.length, 1, 'Princess should remain in items');
+    assert.equal(next.items[0].type, 'princess');
+    assert.equal(next.won, false);
+    assert.ok(!next.messages.some(m => m.includes('pick up')));
   });
 });
 

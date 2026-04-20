@@ -153,6 +153,7 @@ const EQUIPMENT_COLORS = {
   helmet: FG_CYAN,
   shield: FG_CYAN,
   scroll: FG_RED,
+  princess: fg256(212),
 };
 
 const KEY_MAP = {
@@ -354,8 +355,8 @@ function renderGameOver() {
 
 function renderWin() {
   let out = CLEAR + BG_BLACK;
-  out += `\n\n${FG_GREEN}  *** YOU WIN! ***${RESET}\n\n`;
-  out += `  ${FG_YELLOW}You escaped the dungeon on level ${game.level}!${RESET}\n`;
+  out += `\n\n${FG_GREEN}  *** PRINCESS RESCUED! ***${RESET}\n\n`;
+  out += `  ${FG_YELLOW}You rescued the princess on level ${game.level}!${RESET}\n`;
   for (const msg of game.messages) {
     out += `  ${FG_YELLOW}${msg}${RESET}\n`;
   }

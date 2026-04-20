@@ -102,7 +102,11 @@ function newLevel(state) {
   spawnTreasure(map, monsters, items, state.level);
   spawnIdol(map, monsters, items, state.level);
   spawnScrolls(map, monsters, items, state.level);
-  placeStair(map);
+  if (state.level < WIN_LEVEL) {
+    placeStair(map);
+  } else {
+    placePrincess(map, items);
+  }
 
   // Initialize revealed array (all false) and compute initial FOV
   const revealed = Array.from({ length: map.height }, () => new Array(map.width).fill(false));
@@ -143,6 +147,13 @@ function placeStair(map) {
   const cx = Math.floor(room.x + room.w / 2);
   const cy = Math.floor(room.y + room.h / 2);
   map.tiles[cy][cx] = '>';
+}
+
+function placePrincess(map, items) {
+  const room = map.rooms[map.rooms.length - 1];
+  const cx = Math.floor(room.x + room.w / 2);
+  const cy = Math.floor(room.y + room.h / 2);
+  items.push({ x: cx, y: cy, type: 'princess', char: 'P', color: '#ff88cc' });
 }
 
 function spawnFood(map, monsters) {
@@ -379,6 +390,7 @@ function checkPickup(game) {
   const itemHere = items.find(it => it.x === player.x && it.y === player.y);
   if (!itemHere) return game;
   if (itemHere.type === 'idol') return game;
+  if (itemHere.type === 'princess') return game;
 
   if (itemHere.type === 'gold') {
     const value = itemHere.value || 0;
@@ -457,6 +469,17 @@ function checkPickup(game) {
 
 function handleInteract(game) {
   const { player, items } = game;
+  const princessHere = items.find(it => it.x === player.x && it.y === player.y && it.type === 'princess');
+
+  if (princessHere) {
+    const messages = [...game.messages, 'You rescue the princess! The kingdom celebrates.'];
+    return {
+      ...game,
+      messages: messages.slice(-MAX_MESSAGES),
+      won: true,
+    };
+  }
+
   const idolHere = items.find(it => it.x === player.x && it.y === player.y && it.type === 'idol');
 
   if (idolHere) {
@@ -480,15 +503,6 @@ function handleInteract(game) {
   if (tile !== '>') {
     const messages = [...game.messages, 'Nothing to interact with here.'];
     return { ...game, messages: messages.slice(-MAX_MESSAGES) };
-  }
-
-  if (game.level >= WIN_LEVEL) {
-    const messages = [...game.messages, 'You descend the final staircase and escape the dungeon!'];
-    return {
-      ...game,
-      messages: messages.slice(-MAX_MESSAGES),
-      won: true,
-    };
   }
 
   const messages = [...game.messages, `You descend to level ${game.level + 1}.`];

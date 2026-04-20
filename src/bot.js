@@ -55,7 +55,7 @@ export function parseMessageToEvent(msg) {
   if ((m = msg.match(/^You descend to level (\d+)\.$/))) {
     return { type: 'descend', level: parseInt(m[1]) };
   }
-  if (msg.includes('escape the dungeon')) {
+  if (msg.includes('escape the dungeon') || msg.includes('rescue the princess')) {
     return { type: 'win' };
   }
   if (msg === 'There are no stairs here.' || msg === 'Nothing to interact with here.') {
