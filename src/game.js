@@ -57,11 +57,12 @@ const MAX_MESSAGES = 20;
 const WIN_LEVEL = 5;
 const FOOD_HEAL = 10;
 const IDOL_MAXHP_BONUS = 5;
+export const DAGGER_THROW_DAMAGE = 4;
 
 const DEFAULT_STATS = {
   monstersKilled: 0, damageDealt: 0, damageTaken: 0,
   foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-  idolOfferings: 0, spellsCast: 0,
+  idolOfferings: 0, spellsCast: 0, daggersThrown: 0,
 };
 
 function getStats(game) {
@@ -71,10 +72,11 @@ function getStats(game) {
 export function createGame() {
   return newLevel({
     player: { ...PLAYER_STATS },
-    inventory: { food: 0, gold: 0 },
+    inventory: { food: 0, gold: 0, throwingDaggers: 0 },
     equipment: { weapon: null, helmet: null, shield: null },
     spell: null,
     castPending: false,
+    throwPending: false,
     level: 1,
     messages: [],
     gameOver: false,
@@ -89,6 +91,7 @@ export function createGame() {
       goldCollected: 0,
       idolOfferings: 0,
       spellsCast: 0,
+      daggersThrown: 0,
     },
   });
 }
@@ -102,6 +105,7 @@ function newLevel(state) {
   spawnTreasure(map, monsters, items, state.level);
   spawnIdol(map, monsters, items, state.level);
   spawnScrolls(map, monsters, items, state.level);
+  spawnThrowingDaggers(map, monsters, items, state.level);
   if (state.level < WIN_LEVEL) {
     placeStair(map);
   } else {
@@ -127,6 +131,7 @@ function newLevel(state) {
     equipment: state.equipment ? { ...state.equipment } : { weapon: null, helmet: null, shield: null },
     spell: state.spell || null,
     castPending: state.castPending || false,
+    throwPending: state.throwPending || false,
     level: state.level,
     messages: state.messages,
     gameOver: false,
@@ -136,7 +141,7 @@ function newLevel(state) {
     stats: state.stats ? { ...state.stats } : {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
       foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-      idolOfferings: 0, spellsCast: 0,
+      idolOfferings: 0, spellsCast: 0, daggersThrown: 0,
     },
   };
 }
@@ -238,6 +243,28 @@ function spawnScrolls(map, monsters, items, level) {
       const spell = SPELL_TYPES[spellKey];
       items.push({ x, y, type: 'scroll', spellType: spellKey, char: spell.char, color: spell.color });
       break;
+    }
+  }
+}
+
+function spawnThrowingDaggers(map, monsters, items, level) {
+  if (level < 1) return;
+  const count = Math.floor(Math.random() * 3); // 0-2 per level
+  for (let i = 0; i < count; i++) {
+    const roomIdx = 1 + Math.floor(Math.random() * (map.rooms.length - 1));
+    const room = map.rooms[roomIdx];
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const x = room.x + Math.floor(Math.random() * room.w);
+      const y = room.y + Math.floor(Math.random() * room.h);
+      if (
+        isWalkable(map, x, y) &&
+        !monsters.some(m => m.x === x && m.y === y) &&
+        !items.some(it => it.x === x && it.y === y) &&
+        map.tiles[y][x] !== '>'
+      ) {
+        items.push({ x, y, type: 'throwing_dagger', char: '-', color: '#cccc99' });
+        break;
+      }
     }
   }
 }
@@ -350,6 +377,15 @@ export function dispatch(game, action) {
     case 'castCancel':
       next = handleCastCancel(game);
       break;
+    case 'throw':
+      next = handleThrow(game);
+      break;
+    case 'throwDir':
+      next = handleThrowDir(game, action.dir);
+      break;
+    case 'throwCancel':
+      next = handleThrowCancel(game);
+      break;
     case 'restart':
       return createGame();
     default:
@@ -410,6 +446,17 @@ function checkPickup(game) {
       ...game,
       items: items.filter(it => it !== itemHere),
       inventory: { ...game.inventory, food: game.inventory.food + 1 },
+      messages: messages.slice(-MAX_MESSAGES),
+    };
+  }
+
+  if (itemHere.type === 'throwing_dagger') {
+    const newCount = (game.inventory.throwingDaggers || 0) + 1;
+    const messages = [...game.messages, `You pick up a throwing dagger (${newCount} total).`];
+    return {
+      ...game,
+      items: items.filter(it => it !== itemHere),
+      inventory: { ...game.inventory, throwingDaggers: newCount },
       messages: messages.slice(-MAX_MESSAGES),
     };
   }
@@ -512,6 +559,7 @@ function handleInteract(game) {
     equipment: { ...game.equipment },
     spell: game.spell,
     castPending: game.castPending,
+    throwPending: game.throwPending,
     level: game.level + 1,
     messages: messages.slice(-MAX_MESSAGES),
     gameOver: false,
@@ -790,6 +838,97 @@ function handleCastCancel(game) {
   if (!game.castPending) return game;
   const messages = [...game.messages, 'Spell cancelled.'];
   return { ...game, castPending: false, messages: messages.slice(-MAX_MESSAGES) };
+}
+
+function handleThrow(game) {
+  const count = game.inventory.throwingDaggers || 0;
+  if (count <= 0) {
+    const messages = [...game.messages, 'You have no throwing daggers.'];
+    return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+  }
+  const messages = [...game.messages, 'Throw dagger \u2014 choose direction (\u2190\u2191\u2193\u2192).'];
+  return { ...game, throwPending: true, messages: messages.slice(-MAX_MESSAGES) };
+}
+
+function handleThrowDir(game, dir) {
+  if (!game.throwPending) return game;
+  const delta = DIRECTIONS[dir];
+  if (!delta) return game;
+  const count = game.inventory.throwingDaggers || 0;
+  if (count <= 0) {
+    return { ...game, throwPending: false };
+  }
+
+  const messages = [...game.messages];
+  let { player, monsters } = game;
+  let inventory = { ...game.inventory, throwingDaggers: count - 1 };
+  let stats = { ...getStats(game), daggersThrown: getStats(game).daggersThrown + 1 };
+  let items = game.items;
+
+  // Travel from player position; track last walkable tile passed through.
+  let lastWalkX = player.x;
+  let lastWalkY = player.y;
+  let bx = player.x + delta.dx;
+  let by = player.y + delta.dy;
+  let hitMonster = null;
+  let blockedByWall = false;
+
+  while (true) {
+    if (!isWalkable(game.map, bx, by)) {
+      blockedByWall = true;
+      break;
+    }
+    hitMonster = monsters.find(m => m.x === bx && m.y === by);
+    if (hitMonster) break;
+    lastWalkX = bx;
+    lastWalkY = by;
+    bx += delta.dx;
+    by += delta.dy;
+  }
+
+  if (hitMonster) {
+    const base = DAGGER_THROW_DAMAGE - hitMonster.defense;
+    const damage = Math.max(0, base + rollVariance());
+    const newHp = hitMonster.hp - damage;
+    messages.push(`Your throwing dagger hits the ${hitMonster.name} for ${damage} damage.`);
+    stats = { ...stats, damageDealt: stats.damageDealt + damage };
+    if (newHp <= 0) {
+      messages.push(`The ${hitMonster.name} is defeated!`);
+      monsters = monsters.filter(m => m !== hitMonster);
+      stats = { ...stats, monstersKilled: stats.monstersKilled + 1 };
+      const template = MONSTER_TYPES[hitMonster.type];
+      if (template) {
+        const gold = template.minGold + Math.floor(Math.random() * (template.maxGold - template.minGold + 1));
+        if (gold > 0) {
+          inventory = { ...inventory, gold: inventory.gold + gold };
+          stats = { ...stats, goldCollected: stats.goldCollected + gold };
+          messages.push(`The ${hitMonster.name} dropped ${gold} gold.`);
+        }
+      }
+    } else {
+      monsters = monsters.map(m => m === hitMonster ? { ...m, hp: newHp } : m);
+    }
+  } else if (blockedByWall) {
+    items = [...items, { x: lastWalkX, y: lastWalkY, type: 'throwing_dagger', char: '-', color: '#cccc99' }];
+    messages.push('Your throwing dagger clatters to the floor.');
+  }
+
+  const updated = {
+    ...game,
+    monsters,
+    items,
+    inventory,
+    throwPending: false,
+    messages: messages.slice(-MAX_MESSAGES),
+    stats,
+  };
+  return runMonsterTurns(updated);
+}
+
+function handleThrowCancel(game) {
+  if (!game.throwPending) return game;
+  const messages = [...game.messages, 'Throw cancelled.'];
+  return { ...game, throwPending: false, messages: messages.slice(-MAX_MESSAGES) };
 }
 
 let _rollOverride = null;
