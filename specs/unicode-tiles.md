@@ -14,7 +14,7 @@ description: Replace ASCII glyphs with Unicode symbols and emoji for richer tile
 
 Replace plain ASCII characters with Unicode symbols and emoji to give the game
 a richer visual identity. Both the TUI and web renderers get upgraded glyphs,
-with the TUI using a 3-column-per-tile layout to accommodate double-width
+with the TUI using a 2-column-per-tile layout to accommodate double-width
 emoji.
 
 ## Acceptance Criteria
@@ -26,15 +26,15 @@ emoji.
 
    | Entity       | Current | New glyph | Notes                  |
    |--------------|---------|-----------|------------------------|
-   | Player       | `@`     | `@`       | Keep — it's iconic     |
-   | Wall         | `#`     | `█` or connected box-drawing | Single-width block |
-   | Floor        | `.`     | `·` (middle dot U+00B7) | Single-width       |
+   | Player       | `@`     | `@`       | Keep — dark bg, golden fg |
+   | Wall         | `#`     | `██`      | Two consecutive full blocks, no gap |
+   | Floor        | `.`     | ` ` (blank) | Empty space — walls define the shape |
    | Stair down   | `>`     | `▼` or `🪜` | Prefer single-width `▼` in TUI |
    | Rat          | `r`     | `🐀`      | Emoji, double-width    |
-   | Goblin       | `g`     | `👺`      | Emoji, double-width    |
-   | Orc          | `o`     | `👹`      | Emoji, double-width    |
-   | Troll        | `T`     | `🧌`      | Emoji, double-width    |
-   | Potion       | `!`     | `🧪`      | Emoji, double-width    |
+   | Skeleton     | `s`     | `💀`      | Emoji, double-width    |
+   | Bear         | `b`     | `🐻`      | Emoji, double-width    |
+   | Dragon       | `d`     | `🐉`      | Emoji, double-width    |
+   | Food         | `%`     | `🍎`      | Emoji, double-width    |
 
    The exact emoji choices may be adjusted during implementation as long as
    each entity has a distinct, recognizable glyph.
@@ -59,28 +59,42 @@ emoji.
 6. Colors still apply — ANSI color codes wrap the glyph as before. Emoji
    render in their native colors (no ANSI color override needed for them).
 
+7. The player `@` renders with a dark/muted background (e.g., dark brown or
+   dark amber) and a golden/yellow foreground — not the current bright yellow
+   background which is too loud.
+
+8. Wall tiles render as `██` (two full-block characters) filling the entire
+   2-column cell with no gaps, creating seamless solid walls.
+
 ### Web renderer (`index.html`)
 
-7. The canvas renders the new glyphs using the same `fillText` approach.
-   Tile size may be increased (e.g., from 18 to 24 px) if emoji render too
-   small at the current size.
+9. Tile size is increased from 18px to 24px (font from 16px to 22px) so
+   emoji render clearly. The canvas renders the new glyphs using the same
+   `fillText` approach.
 
-8. Emoji are centered within their tile rect. If the default monospace font
-   renders emoji poorly, a fallback font stack can be specified (e.g.,
-   `"Segoe UI Emoji", "Noto Color Emoji", monospace`).
+10. Emoji are centered within their tile rect. If the default monospace font
+    renders emoji poorly, a fallback font stack can be specified (e.g.,
+    `"Segoe UI Emoji", "Noto Color Emoji", monospace`).
 
-### Rendering mode toggle (stretch goal)
+### Runtime rendering mode toggle
 
-9. A toggle between "classic" (ASCII) and "enhanced" (Unicode/emoji) mode,
-   stored in a simple config or query param for web / command-line flag for
-   CLI. If not implemented, default to enhanced mode.
+11. Pressing `Tab` (or another unbound key) toggles between "classic" (ASCII,
+    1-column cells) and "enhanced" (Unicode/emoji, 2-column cells) at runtime.
+    The toggle re-renders immediately with no restart required.
+
+12. The TUI recalculates viewport tile count on toggle (1-col vs 2-col).
+    The web canvas re-renders with the alternate glyph set at the same tile
+    size.
+
+13. Default mode is "enhanced" (emoji). The current mode is shown in the HUD
+    (e.g., `[ASCII]` or `[emoji]`).
 
 ## Out of Scope
 
 - Sprite-based or image-based tile rendering
 - Animated emoji or tile transitions
-- Changes to game logic, FOV, or combat mechanics
-- Adding new entity types — this spec only re-skins existing ones
+- Changes to FOV or combat mechanics
+- Adding new entity types beyond the four listed
 
 ## Design Notes
 
@@ -88,9 +102,15 @@ emoji.
   leading space (` X`) while emoji fill both columns naturally (`🐀`).
 - At 80 columns, the TUI viewport is ~40 tiles wide. At 120 columns, ~60
   tiles. Both are more than sufficient for the existing dungeon sizes.
+- Walls use `██` (two full blocks) to fill the 2-column cell completely,
+  creating seamless walls with no visible gaps between adjacent wall tiles.
+- Floors are blank — the walls already define room/corridor shapes clearly,
+  and empty floors let emoji monsters and items stand out better.
+- The player `@` uses a dark background (e.g., `\x1b[48;5;94m` dark amber)
+  with golden foreground — visible but not glaring.
 - `visual-polish` already changes wall tiles to `█` and floors to `·` in the
-  CLI. This spec extends that by moving the glyph table to a shared module,
-  adding emoji for entities, and adopting the 3-column grid.
+  CLI. This spec overrides those choices: `██` for walls, blank for floors,
+  and moves the glyph table to a shared module with emoji for entities.
 - For the web canvas, emoji font rendering varies by OS. The font stack
   fallback ensures coverage on Windows (Segoe UI Emoji), Linux (Noto Color
   Emoji), and macOS (Apple Color Emoji — usually automatic).
@@ -106,3 +126,7 @@ emoji.
   mixed emoji and single-width chars on the same row.
 - The `getVisibleTiles` function in `src/game.js` returns tile/entity data —
   it does not need to change. Only the rendering layer maps entities to glyphs.
+- This spec replaces the monster roster (Rat/Goblin/Orc/Troll → Rat/Skeleton/
+  Bear/Dragon). Update the monster definitions in `src/game.js` — names, ASCII
+  chars, colors, and stats should scale similarly to the old set (Rat weakest,
+  Dragon strongest). Keep the same spawn logic and stat progression curve.
