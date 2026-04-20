@@ -856,9 +856,9 @@
           const killer = game.stats.causeOfDeath || 'dungeon';
           epitaphEl.textContent = `Slain by a ${killer} on level ${game.level}`;
         } else {
-          overlayTitle.textContent = '\u{1F3C6} You Win!';
+          overlayTitle.textContent = '\u{1F478} Princess Rescued!';
           overlayTitle.className = 'win';
-          epitaphEl.textContent = `Escaped the dungeon on level ${game.level}`;
+          epitaphEl.textContent = `Rescued the princess on level ${game.level}`;
         }
         const s = game.stats;
         const rows = [
