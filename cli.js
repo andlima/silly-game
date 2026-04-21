@@ -149,6 +149,7 @@ const MONSTER_COLORS = {
 
 const EQUIPMENT_COLORS = {
   dagger: FG_WHITE,
+  throwing_dagger: fg256(180),
   sword:  FG_WHITE,
   helmet: FG_CYAN,
   shield: FG_CYAN,
@@ -284,12 +285,15 @@ function render() {
   }
 
   const modeLabel = getRenderMode() === 'enhanced' ? '[emoji]' : '[ASCII]';
+  const daggerCount = game.inventory.throwingDaggers || 0;
+  const daggerLabel = daggerCount > 0 ? String(daggerCount) : '\u2014';
   out += hpBar(game.player.hp, game.player.maxHp);
   out += `  ${FG_CYAN}Level: ${game.level}${RESET}`;
   out += `  ${FG_MAGENTA}Food: ${game.inventory.food}${RESET}`;
   out += `  ${FG_YELLOW}Gold: ${game.inventory.gold}${RESET}`;
+  out += `  ${FG_WHITE}Daggers: ${daggerLabel}${RESET}`;
   out += `  ${FG_GREY}${modeLabel}${RESET}`;
-  out += `  |  ${FG_GREY}p:food  f:cast  >/.:use  Tab:toggle  q:quit${RESET}\n`;
+  out += `  |  ${FG_GREY}p:food  f:cast  t:throw  >/.:use  Tab:toggle  q:quit${RESET}\n`;
 
   // Equipment HUD
   const eq = game.equipment;
@@ -320,6 +324,8 @@ function renderHelp() {
   out += `    ${FG_CYAN}Arrow keys / WASD${RESET}  ${FG_GREY}Move${RESET}\n\n`;
   out += `  ${FG_WHITE}Actions${RESET}\n`;
   out += `    ${FG_CYAN}P${RESET}                  ${FG_GREY}Use food${RESET}\n`;
+  out += `    ${FG_CYAN}F${RESET}                  ${FG_GREY}Cast spell${RESET}\n`;
+  out += `    ${FG_CYAN}T${RESET}                  ${FG_GREY}Throw dagger${RESET}\n`;
   out += `    ${FG_CYAN}. or >${RESET}              ${FG_GREY}Interact / descend${RESET}\n`;
   out += `    ${FG_CYAN}5${RESET}                  ${FG_GREY}Wait a turn${RESET}\n\n`;
   out += `  ${FG_GREY}Walk onto a merchant (M) and press . to shop${RESET}\n\n`;
@@ -341,6 +347,7 @@ function renderStats(out) {
   out += `  ${FG_GREY}Gold spent: ${FG_YELLOW}${s.goldSpent || 0}${RESET}\n`;
   out += `  ${FG_GREY}Idol offerings: ${FG_WHITE}${s.idolOfferings || 0}${RESET}\n`;
   out += `  ${FG_GREY}Spells cast: ${FG_WHITE}${s.spellsCast || 0}${RESET}\n`;
+  out += `  ${FG_GREY}Daggers thrown: ${FG_WHITE}${s.daggersThrown || 0}${RESET}\n`;
   out += `  ${FG_GREY}Steps taken: ${FG_WHITE}${s.stepsTaken || 0}${RESET}\n`;
   return out;
 }
@@ -437,9 +444,28 @@ process.stdin.on('data', (key) => {
     return;
   }
 
+  // Throw-pending mode: direction keys throw, anything else cancels
+  if (game.throwPending) {
+    const dir = KEY_MAP[key];
+    if (dir) {
+      game = dispatch(game, { type: 'throwDir', dir });
+    } else {
+      game = dispatch(game, { type: 'throwCancel' });
+    }
+    render();
+    return;
+  }
+
   // 'f' triggers cast
   if (key === 'f' || key === 'F') {
     game = dispatch(game, { type: 'cast' });
+    render();
+    return;
+  }
+
+  // 't' triggers throw
+  if (key === 't' || key === 'T') {
+    game = dispatch(game, { type: 'throw' });
     render();
     return;
   }

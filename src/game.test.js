@@ -56,6 +56,7 @@ function makeGame(overrides = {}) {
     castPending: overrides.castPending || false,
     shopPending: overrides.shopPending || false,
     shopItems: overrides.shopItems !== undefined ? overrides.shopItems : null,
+    throwPending: overrides.throwPending || false,
     level: overrides.level || 1,
     messages: overrides.messages || [],
     gameOver: overrides.gameOver || false,
@@ -65,7 +66,7 @@ function makeGame(overrides = {}) {
     stats: {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
       foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-      idolOfferings: 0, spellsCast: 0, goldSpent: 0,
+      idolOfferings: 0, spellsCast: 0, goldSpent: 0, daggersThrown: 0,
       ...overrides.stats,
     },
   };
@@ -1716,5 +1717,173 @@ describe('scroll spawn randomization', () => {
     for (const t of seenTypes) {
       assert.ok(SPELL_TYPES[t], `Unknown spell type: ${t}`);
     }
+  });
+});
+
+describe('throwing daggers', () => {
+  beforeEach(() => setRollOverride(() => 0));
+  afterEach(() => setRollOverride(null));
+
+  it('picking up a throwing dagger adds one to the stack and removes the item', () => {
+    const dag = { x: 3, y: 2, type: 'throwing_dagger', char: '-', color: '#cccc99' };
+    const game = makeGame({ items: [dag], inventory: { food: 0, gold: 0, throwingDaggers: 0 } });
+    const next = dispatch(game, { type: 'move', dir: 'e' });
+    assert.equal(next.items.length, 0);
+    assert.equal(next.inventory.throwingDaggers, 1);
+    assert.ok(next.messages.some(m => m.includes('pick up a throwing dagger') && m.includes('1 total')));
+  });
+
+  it('throw with empty stack logs message and does not consume a turn', () => {
+    const monster = makeMonster({ x: 3, y: 2, attack: 4, defense: 100 });
+    const game = makeGame({ monsters: [monster], inventory: { throwingDaggers: 0 } });
+    const next = dispatch(game, { type: 'throw' });
+    assert.equal(next.throwPending, false);
+    assert.ok(next.messages.some(m => m.includes('no throwing daggers')));
+    // Monster should NOT have attacked
+    assert.equal(next.player.hp, 30);
+  });
+
+  it('throw with stack > 0 sets throwPending without running monster turns', () => {
+    const monster = makeMonster({ x: 3, y: 2, attack: 4, defense: 100 });
+    const game = makeGame({ monsters: [monster], inventory: { throwingDaggers: 2 } });
+    const next = dispatch(game, { type: 'throw' });
+    assert.equal(next.throwPending, true);
+    assert.equal(next.inventory.throwingDaggers, 2);
+    assert.equal(next.player.hp, 30);
+    assert.ok(next.messages.some(m => m.includes('Throw dagger') && m.includes('choose direction')));
+  });
+
+  it('throwDir at a monster deals damage with melee defense+variance, decrements stack, runs monster turns', () => {
+    setRollOverride(() => 1); // +1 variance
+    // DAGGER_THROW_DAMAGE=4, monster defense=1 => base 3, +1 variance => 4
+    // Use type 'skeleton' tracker; identify after by the unique type+initial location.
+    const monster = makeMonster({ x: 5, y: 2, hp: 20, maxHp: 20, defense: 1, attack: 0, name: 'Skeleton', type: 'skeleton' });
+    // Adjacent rat that will attack on monster turn
+    const adj = makeMonster({ x: 2, y: 3, hp: 100, maxHp: 100, attack: 10, defense: 0, name: 'Rat', type: 'rat' });
+    const game = makeGame({
+      monsters: [monster, adj],
+      inventory: { throwingDaggers: 3 },
+      throwPending: true,
+    });
+    const next = dispatch(game, { type: 'throwDir', dir: 'e' });
+    const skeleton = next.monsters.find(m => m.type === 'skeleton');
+    assert.ok(skeleton, 'target monster should still exist');
+    assert.equal(skeleton.hp, 16); // 20 - 4
+    assert.equal(next.inventory.throwingDaggers, 2);
+    assert.equal(next.throwPending, false);
+    assert.ok(next.player.hp < 30, 'Adjacent monster should have attacked (turn consumed)');
+  });
+
+  it('throwDir into open corridor drops dagger on last walkable tile when blocked by wall', () => {
+    // Floor at (1,2) (2,2) (3,2) (4,2); wall at (5,2) (rest of map is wall)
+    const map = makeMap(7, 5, [[1,2],[2,2],[3,2],[4,2]]);
+    const game = makeGame({
+      map,
+      player: { x: 2, y: 2 },
+      inventory: { throwingDaggers: 1 },
+      throwPending: true,
+    });
+    const next = dispatch(game, { type: 'throwDir', dir: 'e' });
+    // Should drop on (4,2) — the last walkable tile before the wall at (5,2)
+    const dropped = next.items.find(it => it.type === 'throwing_dagger');
+    assert.ok(dropped, 'A throwing_dagger item should be on the floor');
+    assert.equal(dropped.x, 4);
+    assert.equal(dropped.y, 2);
+    assert.equal(next.inventory.throwingDaggers, 0);
+    assert.ok(next.messages.some(m => m.includes('clatters to the floor')));
+  });
+
+  it('throwDir where adjacent tile is a wall drops dagger on player tile', () => {
+    // Player at (2,2); only floor is (2,2). All other tiles walls.
+    const map = makeMap(5, 5, [[2,2]]);
+    const game = makeGame({
+      map,
+      player: { x: 2, y: 2 },
+      inventory: { throwingDaggers: 1 },
+      throwPending: true,
+    });
+    const next = dispatch(game, { type: 'throwDir', dir: 'e' });
+    const dropped = next.items.find(it => it.type === 'throwing_dagger');
+    assert.ok(dropped, 'A throwing_dagger item should drop');
+    assert.equal(dropped.x, 2);
+    assert.equal(dropped.y, 2);
+    assert.equal(next.inventory.throwingDaggers, 0);
+  });
+
+  it('killing a monster with a thrown dagger drops gold and increments monstersKilled', () => {
+    // Skeleton has minGold=2, maxGold=4
+    const monster = makeMonster({ x: 4, y: 2, hp: 1, maxHp: 10, defense: 0, type: 'skeleton', name: 'Skeleton' });
+    const origRandom = Math.random;
+    Math.random = () => 0.5; // deterministic gold roll
+    const game = makeGame({
+      monsters: [monster],
+      inventory: { food: 0, gold: 0, throwingDaggers: 1 },
+      throwPending: true,
+    });
+    const next = dispatch(game, { type: 'throwDir', dir: 'e' });
+    Math.random = origRandom;
+    assert.equal(next.monsters.length, 0);
+    assert.equal(next.stats.monstersKilled, 1);
+    assert.ok(next.inventory.gold >= 2 && next.inventory.gold <= 4);
+    assert.ok(next.messages.some(m => m.includes('defeated')));
+  });
+
+  it('throwCancel clears throwPending and does not consume a turn', () => {
+    const monster = makeMonster({ x: 3, y: 2, attack: 4, defense: 100 });
+    const game = makeGame({
+      monsters: [monster],
+      inventory: { throwingDaggers: 2 },
+      throwPending: true,
+    });
+    const next = dispatch(game, { type: 'throwCancel' });
+    assert.equal(next.throwPending, false);
+    assert.equal(next.inventory.throwingDaggers, 2);
+    assert.equal(next.player.hp, 30, 'Monster should not have attacked (no turn consumed)');
+    assert.ok(next.messages.some(m => m.includes('Throw cancelled')));
+  });
+
+  it('daggersThrown increments on every throw (hit and miss)', () => {
+    // Hit
+    const monster = makeMonster({ x: 4, y: 2, hp: 20, maxHp: 20, defense: 0 });
+    const g1 = makeGame({
+      monsters: [monster],
+      inventory: { throwingDaggers: 2 },
+      throwPending: true,
+    });
+    const r1 = dispatch(g1, { type: 'throwDir', dir: 'e' });
+    assert.equal(r1.stats.daggersThrown, 1);
+
+    // Miss (open corridor with wall — counts as throw)
+    const map = makeMap(7, 5, [[1,2],[2,2],[3,2],[4,2]]);
+    const g2 = makeGame({
+      map,
+      player: { x: 2, y: 2 },
+      inventory: { throwingDaggers: 1 },
+      throwPending: true,
+    });
+    const r2 = dispatch(g2, { type: 'throwDir', dir: 'e' });
+    assert.equal(r2.stats.daggersThrown, 1);
+  });
+
+  it('throwingDaggers stack and throwPending flag persist across level transitions', () => {
+    const floor = [];
+    for (let y = 1; y <= 5; y++)
+      for (let x = 1; x <= 8; x++)
+        floor.push([x, y]);
+    const map = makeMap(10, 7, floor, [
+      { x: 1, y: 1, w: 3, h: 3 },
+      { x: 5, y: 1, w: 3, h: 3 },
+    ]);
+    map.tiles[2][2] = STAIR;
+    const game = makeGame({
+      map,
+      level: 1,
+      inventory: { food: 0, gold: 0, throwingDaggers: 4 },
+      throwPending: true,
+    });
+    const next = dispatch(game, { type: 'descend' });
+    assert.equal(next.level, 2);
+    assert.equal(next.inventory.throwingDaggers, 4);
+    assert.equal(next.throwPending, true);
   });
 });

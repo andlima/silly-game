@@ -276,6 +276,7 @@
     <span class="gold" id="hud-gold"></span>
     <span class="equipment" id="hud-equipment"></span>
     <span class="equipment" id="hud-spell"></span>
+    <span class="equipment" id="hud-daggers"></span>
     <span class="mode" id="hud-mode"></span>
     <button id="mute-btn" class="hud-btn" title="Toggle sound">&#x1f50a;</button>
     <button id="help-btn" class="hud-btn" title="Show controls help">?</button>
@@ -292,6 +293,7 @@
       <div class="help-row"><span class="help-key">. or &gt;</span><span class="help-desc">Interact / descend</span></div>
       <div class="help-row"><span class="help-key">5</span><span class="help-desc">Wait a turn</span></div>
       <div class="help-row"><span class="help-key">F</span><span class="help-desc">Cast spell</span></div>
+      <div class="help-row"><span class="help-key">T</span><span class="help-desc">Throw dagger</span></div>
       <h3>Toggles</h3>
       <div class="help-row"><span class="help-key">Tab</span><span class="help-desc">Cycle render mode</span></div>
       <div class="help-row"><span class="help-key">M</span><span class="help-desc">Toggle minimap</span></div>
@@ -833,6 +835,15 @@
         spellEl.innerHTML = '<span style="opacity:0.3">Spell: \u2014</span>';
       }
 
+      // Throwing daggers HUD
+      const daggersEl = document.getElementById('hud-daggers');
+      const daggerCount = game.inventory.throwingDaggers || 0;
+      if (daggerCount > 0) {
+        daggersEl.innerHTML = `<span>\u{1F52A}${daggerCount}</span>`;
+      } else {
+        daggersEl.innerHTML = '<span style="opacity:0.3">\u{1F52A}\u2014</span>';
+      }
+
       const modeLabels = { sprite: '[sprite]', emoji: '[emoji]', ascii: '[ASCII]' };
       modeEl.textContent = modeLabels[renderMode];
 
@@ -870,6 +881,7 @@
           ['Gold spent', s.goldSpent || 0],
           ['Idol offerings', s.idolOfferings || 0],
           ['Spells cast', s.spellsCast || 0],
+          ['Daggers thrown', s.daggersThrown || 0],
           ['Food eaten', s.foodUsed],
           ['Steps taken', s.stepsTaken],
         ];
@@ -910,6 +922,7 @@
     function dispatchAndPlay(action) {
       const oldGame = game;
       game = dispatch(game, action);
+      if (action && action.type === 'throwDir' && audioReady) playAttack();
       playAudioForDiff(oldGame, game);
       render();
     }
@@ -1048,11 +1061,32 @@
         return;
       }
 
+      // Throw-pending mode: direction keys throw, anything else cancels
+      if (game.throwPending) {
+        e.preventDefault();
+        stopHoldRepeat();
+        const dir = KEY_MAP[e.key];
+        if (dir) {
+          dispatchAndPlay({ type: 'throwDir', dir });
+        } else {
+          dispatchAndPlay({ type: 'throwCancel' });
+        }
+        return;
+      }
+
       // 'f' triggers cast
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         stopHoldRepeat();
         dispatchAndPlay({ type: 'cast' });
+        return;
+      }
+
+      // 't' triggers throw
+      if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        stopHoldRepeat();
+        dispatchAndPlay({ type: 'throw' });
         return;
       }
 
