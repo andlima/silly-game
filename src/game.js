@@ -62,7 +62,17 @@ export const DAGGER_THROW_DAMAGE = 4;
 const DEFAULT_STATS = {
   monstersKilled: 0, damageDealt: 0, damageTaken: 0,
   foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-  idolOfferings: 0, spellsCast: 0, daggersThrown: 0,
+  idolOfferings: 0, spellsCast: 0, goldSpent: 0, daggersThrown: 0,
+};
+
+const MERCHANT_PRICES = {
+  food: 3,
+  throwing_dagger: 2,
+  dagger: 5,
+  helmet: 5,
+  sword: 12,
+  shield: 8,
+  scroll: 8,
 };
 
 function getStats(game) {
@@ -91,6 +101,7 @@ export function createGame() {
       goldCollected: 0,
       idolOfferings: 0,
       spellsCast: 0,
+      goldSpent: 0,
       daggersThrown: 0,
     },
   });
@@ -105,6 +116,7 @@ function newLevel(state) {
   spawnTreasure(map, monsters, items, state.level);
   spawnIdol(map, monsters, items, state.level);
   spawnScrolls(map, monsters, items, state.level);
+  spawnMerchant(map, monsters, items, state.level);
   spawnThrowingDaggers(map, monsters, items, state.level);
   if (state.level < WIN_LEVEL) {
     placeStair(map);
@@ -131,6 +143,8 @@ function newLevel(state) {
     equipment: state.equipment ? { ...state.equipment } : { weapon: null, helmet: null, shield: null },
     spell: state.spell || null,
     castPending: state.castPending || false,
+    shopPending: false,
+    shopItems: null,
     throwPending: state.throwPending || false,
     level: state.level,
     messages: state.messages,
@@ -141,7 +155,7 @@ function newLevel(state) {
     stats: state.stats ? { ...state.stats } : {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
       foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-      idolOfferings: 0, spellsCast: 0, daggersThrown: 0,
+      idolOfferings: 0, spellsCast: 0, goldSpent: 0, daggersThrown: 0,
     },
   };
 }
@@ -219,6 +233,42 @@ function spawnIdol(map, monsters, items, level) {
       map.tiles[y][x] !== '>'
     ) {
       items.push({ x, y, type: 'idol', char: 'I', color: '#ccaa44' });
+      break;
+    }
+  }
+}
+
+function generateMerchantStock(level) {
+  const stock = [];
+  // Slot 1: food
+  stock.push({ kind: 'food', price: MERCHANT_PRICES.food });
+  // Slot 2: throwing_dagger OR equipment (50/50). Throwing daggers not yet
+  // implemented, so always substitute equipment.
+  const eqType = pickEquipmentType(level);
+  stock.push({ kind: 'equipment', subtype: eqType, price: MERCHANT_PRICES[eqType] });
+  // Slot 3: random spell scroll
+  const spellKeys = Object.keys(SPELL_TYPES);
+  const spellKey = spellKeys[Math.floor(Math.random() * spellKeys.length)];
+  stock.push({ kind: 'scroll', subtype: spellKey, price: MERCHANT_PRICES.scroll });
+  return stock;
+}
+
+function spawnMerchant(map, monsters, items, level) {
+  if (level < 2 || level > 4) return;
+  if (Math.random() < 0.5) return; // 50% probability
+  const roomIdx = 1 + Math.floor(Math.random() * (map.rooms.length - 1));
+  const room = map.rooms[roomIdx];
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const x = room.x + Math.floor(Math.random() * room.w);
+    const y = room.y + Math.floor(Math.random() * room.h);
+    if (
+      isWalkable(map, x, y) &&
+      !monsters.some(m => m.x === x && m.y === y) &&
+      !items.some(it => it.x === x && it.y === y) &&
+      map.tiles[y][x] !== '>'
+    ) {
+      const stock = generateMerchantStock(level);
+      items.push({ x, y, type: 'merchant', stock, char: 'M', color: '#ffdd66' });
       break;
     }
   }
@@ -377,6 +427,12 @@ export function dispatch(game, action) {
     case 'castCancel':
       next = handleCastCancel(game);
       break;
+    case 'shopBuy':
+      next = handleShopBuy(game, action.slot);
+      break;
+    case 'shopClose':
+      next = handleShopClose(game);
+      break;
     case 'throw':
       next = handleThrow(game);
       break;
@@ -427,6 +483,7 @@ function checkPickup(game) {
   if (!itemHere) return game;
   if (itemHere.type === 'idol') return game;
   if (itemHere.type === 'princess') return game;
+  if (itemHere.type === 'merchant') return game;
 
   if (itemHere.type === 'gold') {
     const value = itemHere.value || 0;
@@ -516,6 +573,21 @@ function checkPickup(game) {
 
 function handleInteract(game) {
   const { player, items } = game;
+
+  const merchantHere = items.find(it => it.x === player.x && it.y === player.y && it.type === 'merchant');
+  if (merchantHere) {
+    const shopItems = [...merchantHere.stock];
+    const menuLines = formatShopMenuLines(shopItems);
+    const messages = [...game.messages, ...menuLines];
+    return {
+      ...game,
+      shopPending: true,
+      shopItems,
+      castPending: false,
+      messages: messages.slice(-MAX_MESSAGES),
+    };
+  }
+
   const princessHere = items.find(it => it.x === player.x && it.y === player.y && it.type === 'princess');
 
   if (princessHere) {
@@ -838,6 +910,136 @@ function handleCastCancel(game) {
   if (!game.castPending) return game;
   const messages = [...game.messages, 'Spell cancelled.'];
   return { ...game, castPending: false, messages: messages.slice(-MAX_MESSAGES) };
+}
+
+function formatShopEntry(entry) {
+  if (entry.kind === 'food') return `Food — ${entry.price}g`;
+  if (entry.kind === 'throwing_dagger') return `Throwing dagger — ${entry.price}g`;
+  if (entry.kind === 'equipment') {
+    const eq = EQUIPMENT_TYPES[entry.subtype];
+    const statLabel = eq.stat === 'attack' ? 'atk' : 'def';
+    return `${eq.name} (+${eq.bonus} ${statLabel}) — ${entry.price}g`;
+  }
+  if (entry.kind === 'scroll') {
+    const spell = SPELL_TYPES[entry.subtype];
+    return `${spell.name} scroll — ${entry.price}g`;
+  }
+  return '???';
+}
+
+function formatShopMenuLines(shopItems) {
+  const lines = ['Merchant: "What\'ll it be?"'];
+  shopItems.forEach((entry, idx) => {
+    const label = entry === null ? '(sold out)' : formatShopEntry(entry);
+    lines.push(`  ${idx + 1}) ${label}`);
+  });
+  lines.push('(press number to buy, any other key to leave)');
+  return lines;
+}
+
+function finalizeShopBuy(game, merchant, slot, updates, message) {
+  const entry = merchant.stock[slot];
+  const newStock = merchant.stock.map((e, i) => i === slot ? null : e);
+  const newMerchant = { ...merchant, stock: newStock };
+  const newItems = game.items.map(it => it === merchant ? newMerchant : it);
+  const stats = getStats(game);
+  const messages = [...game.messages, message];
+  return {
+    ...game,
+    ...updates,
+    items: newItems,
+    shopItems: newStock,
+    stats: { ...stats, goldSpent: (stats.goldSpent || 0) + entry.price },
+    messages: messages.slice(-MAX_MESSAGES),
+  };
+}
+
+function handleShopBuy(game, slot) {
+  if (!game.shopPending) return game;
+  const { player, items } = game;
+  const merchant = items.find(it => it.x === player.x && it.y === player.y && it.type === 'merchant');
+  if (!merchant) return game;
+  if (typeof slot !== 'number' || slot < 0 || slot >= merchant.stock.length) return game;
+  const entry = merchant.stock[slot];
+  if (entry === null) return game;
+
+  if (game.inventory.gold < entry.price) {
+    const messages = [...game.messages, 'Not enough gold.'];
+    return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+  }
+
+  if (entry.kind === 'food') {
+    return finalizeShopBuy(game, merchant, slot, {
+      inventory: {
+        ...game.inventory,
+        gold: game.inventory.gold - entry.price,
+        food: game.inventory.food + 1,
+      },
+    }, `You buy food for ${entry.price}g.`);
+  }
+
+  if (entry.kind === 'throwing_dagger') {
+    const tdCount = game.inventory.throwingDaggers || 0;
+    return finalizeShopBuy(game, merchant, slot, {
+      inventory: {
+        ...game.inventory,
+        gold: game.inventory.gold - entry.price,
+        throwingDaggers: tdCount + 1,
+      },
+    }, `You buy a throwing dagger for ${entry.price}g.`);
+  }
+
+  if (entry.kind === 'equipment') {
+    const eqDef = EQUIPMENT_TYPES[entry.subtype];
+    if (!eqDef) return game;
+    const current = game.equipment[eqDef.slot];
+    if (current && current.bonus >= eqDef.bonus) {
+      const messages = [...game.messages, 'You already have better equipment — the merchant refunds your gold.'];
+      return { ...game, messages: messages.slice(-MAX_MESSAGES) };
+    }
+    const newEquipment = {
+      ...game.equipment,
+      [eqDef.slot]: { type: entry.subtype, name: eqDef.name, bonus: eqDef.bonus, stat: eqDef.stat },
+    };
+    const statLabel = eqDef.stat === 'attack' ? 'atk' : 'def';
+    return finalizeShopBuy(game, merchant, slot, {
+      inventory: { ...game.inventory, gold: game.inventory.gold - entry.price },
+      equipment: newEquipment,
+    }, `You buy a ${eqDef.name} (+${eqDef.bonus} ${statLabel}) for ${entry.price}g.`);
+  }
+
+  if (entry.kind === 'scroll') {
+    const spellDef = SPELL_TYPES[entry.subtype];
+    if (!spellDef) return game;
+    const currentSpell = game.spell;
+    const newSpell = { type: entry.subtype, name: spellDef.name, charges: spellDef.charges };
+    let buyMsg;
+    if (!currentSpell) {
+      buyMsg = `You buy a ${spellDef.name} scroll (${spellDef.charges} charges) for ${entry.price}g.`;
+    } else if (currentSpell.type === entry.subtype && currentSpell.charges <= spellDef.charges) {
+      buyMsg = `You buy a fresher ${spellDef.name} scroll for ${entry.price}g.`;
+    } else {
+      buyMsg = `You discard your ${currentSpell.name} scroll and buy a ${spellDef.name} scroll for ${entry.price}g.`;
+    }
+    return finalizeShopBuy(game, merchant, slot, {
+      inventory: { ...game.inventory, gold: game.inventory.gold - entry.price },
+      spell: newSpell,
+      castPending: false,
+    }, buyMsg);
+  }
+
+  return game;
+}
+
+function handleShopClose(game) {
+  if (!game.shopPending) return game;
+  const messages = [...game.messages, 'You leave the merchant.'];
+  return {
+    ...game,
+    shopPending: false,
+    shopItems: null,
+    messages: messages.slice(-MAX_MESSAGES),
+  };
 }
 
 function handleThrow(game) {
