@@ -4,6 +4,7 @@ status: not-started
 area: backend
 priority: 50
 depends_on: []
+bump: patch          # patch | minor | major | none — default: patch
 description: Short one-line description of the feature
 ---
 
@@ -31,6 +32,14 @@ Describe what this spec achieves and why it matters. Keep it to 2-3 sentences.
 
 Optional section for implementation hints, architectural constraints, or
 references to relevant code paths.
+
+## Verify
+
+1. <feature-specific check>
+2. <feature-specific check>
+3. Run `npm run bump` (or `npm run bump -- minor|major` if the spec sets
+   a non-default `bump:` level; skip if `bump: none`) and commit the
+   updated `package.json` and `src/version.js`.
 
 ## Agent Notes
 
