@@ -39,16 +39,36 @@ When launched by the orchestrator for `implement`, follow this contract:
    - Verify retry: fix the failing gate output provided by orchestrator
    - Review retry: address unresolved review findings only
    - Merge-conflict retry: resolve merge conflicts only
-4. **Run verify gates locally** before reporting.
-5. **Do not run orchestrator lifecycle commands** (`spec implement`,
+4. **Bump the version.** For code-changing specs, run `npm run bump`
+   (defaults to patch). If the spec frontmatter sets `bump:` to `minor` or
+   `major`, run `npm run bump -- minor` / `npm run bump -- major`. If
+   `bump: none`, skip. Commit the resulting `package.json` and
+   `src/version.js` changes alongside the rest of your work. Doc-only and
+   spec-only changes should set `bump: none`.
+5. **Run verify gates locally** before reporting.
+6. **Do not run orchestrator lifecycle commands** (`spec implement`,
    `spec phase`) or publish/merge/cleanup actions from inside the
    implementation session. `spec report` is the exception — it is required
-   (see step 6).
-6. **Report completion before exit**:
+   (see step 7).
+7. **Report completion before exit**:
    ```bash
    spec report --status ok|blocked|error --summary "..."
    ```
    Wait for `Completion recorded for <spec-id>:` before exiting.
+
+### Spec Frontmatter
+
+Spec files start with a YAML frontmatter block. Recognized fields:
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `id` | yes | Spec identifier (matches the filename). |
+| `status` | yes | `not-started` for new specs; `obsolete` to exclude from dispatch. |
+| `area` | yes | Free-form area tag (e.g. `feature`, `infra`, `backend`). |
+| `priority` | yes | Integer; lower runs first. |
+| `depends_on` | yes | List of spec ids that must ship first (may be empty). |
+| `description` | yes | One-line summary. |
+| `bump` | no | `patch` (default) \| `minor` \| `major` \| `none`. Controls the version bump performed during implement. Use `none` for doc-only / spec-only changes. |
 
 ### Branch and Worktree Conventions
 
