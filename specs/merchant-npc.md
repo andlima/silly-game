@@ -13,7 +13,7 @@ description: Add a shopkeeper NPC that occasionally appears on a dungeon level a
 
 Give gold somewhere to go besides the idol, and give the player a way to
 shape their loadout mid-run. On some dungeon floors, a merchant appears in a
-random room with a small fixed stock (food, throwing daggers, equipment,
+random room with a small fixed stock (food, throwing blades, equipment,
 scrolls). Walking onto the merchant and pressing interact opens a keyboard
 shop menu in the message area — press a number to buy, any other key to
 leave.
@@ -38,14 +38,14 @@ When a merchant spawns, generate exactly three stock entries. Each entry is
 an object:
 
 ```js
-{ kind: 'food' | 'throwing_dagger' | 'equipment' | 'scroll',
+{ kind: 'food' | 'throwing_blade' | 'equipment' | 'scroll',
   subtype: <equipment type or spell type, only for kind === 'equipment' | 'scroll'>,
   price: <gold cost> }
 ```
 
 Stock composition:
 - Slot 1: always `food` (the most useful reliable purchase).
-- Slot 2: `throwing_dagger` OR a random equipment piece, 50/50. If the run
+- Slot 2: `throwing_blade` OR a random equipment piece, 50/50. If the run
   does not include `throwing-dagger` yet, substitute equipment.
 - Slot 3: a random spell scroll (`firebolt`, `lightning`, `frost`, or
   `whirlwind`, uniform random).
@@ -55,7 +55,7 @@ Price table (gold):
 | Kind              | Price |
 |-------------------|-------|
 | food              | 3     |
-| throwing_dagger   | 2     |
+| throwing_blade    | 2     |
 | dagger            | 5     |
 | helmet            | 5     |
 | sword             | 12    |
@@ -76,7 +76,7 @@ idol.
      ```
      Merchant: "What'll it be?"
        1) Food — 3g
-       2) Throwing dagger — 2g      (or "Dagger (+2 atk) — 5g", etc.)
+       2) Throwing blade — 2g      (or "Dagger (+2 atk) — 5g", etc.)
        3) Firebolt scroll — 8g
      (press number to buy, any other key to leave)
      ```
@@ -105,7 +105,7 @@ idol.
 Reuse the existing pickup rules rather than inventing new ones:
 
 - `food`: `inventory.food += 1`.
-- `throwing_dagger`: `inventory.throwingDaggers += 1` (requires the
+- `throwing_blade`: `inventory.throwingBlades += 1` (requires the
   throwing-dagger spec to be implemented; if not, slot 2 will never be a
   dagger).
 - `equipment`: call the same auto-equip branch used by `checkPickup` — if
@@ -231,7 +231,7 @@ Surface in the game-over stats display.
   cardinal-only and the merchant tile is walkable (walk onto it instead of
   attacking).
 - Multiple merchants per level.
-- Dependency wiring on the `throwing-dagger` spec: if throwing daggers are
+- Dependency wiring on the `throwing-dagger` spec: if throwing blades are
   not implemented yet, the merchant substitutes equipment into slot 2
   (see stock composition rules) so this spec can ship independently.
 
