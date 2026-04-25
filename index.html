@@ -302,7 +302,7 @@
       <div class="help-row"><span class="help-key">. or &gt;</span><span class="help-desc">Interact / descend</span></div>
       <div class="help-row"><span class="help-key">5</span><span class="help-desc">Wait a turn</span></div>
       <div class="help-row"><span class="help-key">F</span><span class="help-desc">Cast spell</span></div>
-      <div class="help-row"><span class="help-key">T</span><span class="help-desc">Throw dagger</span></div>
+      <div class="help-row"><span class="help-key">T</span><span class="help-desc">Throw blade</span></div>
       <h3>Toggles</h3>
       <div class="help-row"><span class="help-key">Tab</span><span class="help-desc">Cycle render mode</span></div>
       <div class="help-row"><span class="help-key">M</span><span class="help-desc">Toggle minimap</span></div>
@@ -816,7 +816,7 @@
       const equipParts = [];
       // weapon
       if (eq.weapon) {
-        const wEmoji = eq.weapon.name === 'Dagger' ? '\u{1F5E1}\uFE0F' : '\u2694\uFE0F';
+        const wEmoji = eq.weapon.name === 'Knife' ? '\u{1F52A}' : '\u2694\uFE0F';
         equipParts.push(`${wEmoji}+${eq.weapon.bonus}`);
       } else {
         equipParts.push('<span style="opacity:0.3">\u2694\uFE0F</span>');
@@ -850,9 +850,9 @@
       const daggersEl = document.getElementById('hud-daggers');
       const daggerCount = game.inventory.throwingDaggers || 0;
       if (daggerCount > 0) {
-        daggersEl.innerHTML = `<span>\u{1F52A}${daggerCount}</span>`;
+        daggersEl.innerHTML = `<span>\u{1F5E1}\uFE0F${daggerCount}</span>`;
       } else {
-        daggersEl.innerHTML = '<span style="opacity:0.3">\u{1F52A}\u2014</span>';
+        daggersEl.innerHTML = '<span style="opacity:0.3">\u{1F5E1}\uFE0F\u2014</span>';
       }
 
       syncActionButtons(daggerCount);
@@ -894,7 +894,7 @@
           ['Gold spent', s.goldSpent || 0],
           ['Idol offerings', s.idolOfferings || 0],
           ['Spells cast', s.spellsCast || 0],
-          ['Daggers thrown', s.daggersThrown || 0],
+          ['Blades thrown', s.daggersThrown || 0],
           ['Food eaten', s.foodUsed],
           ['Steps taken', s.stepsTaken],
         ];

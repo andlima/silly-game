@@ -369,14 +369,14 @@ describe('equipment', () => {
     assert.equal(next.items.length, 0);
     assert.equal(next.equipment.weapon.type, 'dagger');
     assert.equal(next.equipment.weapon.bonus, 2);
-    assert.ok(next.messages.some(m => m.includes('equip a Dagger')));
+    assert.ok(next.messages.some(m => m.includes('equip a Knife')));
   });
 
   it('picking up a strictly better item replaces equipped item', () => {
     const sword = { x: 3, y: 2, type: 'sword', char: '/', color: '#dddddd' };
     const game = makeGame({
       items: [sword],
-      equipment: { weapon: { type: 'dagger', name: 'Dagger', bonus: 2, stat: 'attack' }, helmet: null, shield: null },
+      equipment: { weapon: { type: 'dagger', name: 'Knife', bonus: 2, stat: 'attack' }, helmet: null, shield: null },
     });
     const next = dispatch(game, { type: 'move', dir: 'e' });
     assert.equal(next.items.length, 0);
@@ -1681,7 +1681,7 @@ describe('merchant shop', () => {
     const game = makeGame({
       items: [merchant],
       inventory: { gold: 20 },
-      equipment: { weapon: { type: 'dagger', name: 'Dagger', bonus: 2, stat: 'attack' }, helmet: null, shield: null },
+      equipment: { weapon: { type: 'dagger', name: 'Knife', bonus: 2, stat: 'attack' }, helmet: null, shield: null },
       shopPending: true,
       shopItems: stock,
     });
@@ -1820,17 +1820,17 @@ describe('scroll spawn randomization', () => {
   });
 });
 
-describe('throwing daggers', () => {
+describe('throwing blades', () => {
   beforeEach(() => setRollOverride(() => 0));
   afterEach(() => setRollOverride(null));
 
-  it('picking up a throwing dagger adds one to the stack and removes the item', () => {
+  it('picking up a throwing blade adds one to the stack and removes the item', () => {
     const dag = { x: 3, y: 2, type: 'throwing_dagger', char: '-', color: '#cccc99' };
     const game = makeGame({ items: [dag], inventory: { food: 0, gold: 0, throwingDaggers: 0 } });
     const next = dispatch(game, { type: 'move', dir: 'e' });
     assert.equal(next.items.length, 0);
     assert.equal(next.inventory.throwingDaggers, 1);
-    assert.ok(next.messages.some(m => m.includes('pick up a throwing dagger') && m.includes('1 total')));
+    assert.ok(next.messages.some(m => m.includes('pick up a throwing blade') && m.includes('1 total')));
   });
 
   it('throw with empty stack logs message and does not consume a turn', () => {
@@ -1838,7 +1838,7 @@ describe('throwing daggers', () => {
     const game = makeGame({ monsters: [monster], inventory: { throwingDaggers: 0 } });
     const next = dispatch(game, { type: 'throw' });
     assert.equal(next.throwPending, false);
-    assert.ok(next.messages.some(m => m.includes('no throwing daggers')));
+    assert.ok(next.messages.some(m => m.includes('no throwing blades')));
     // Monster should NOT have attacked
     assert.equal(next.player.hp, 30);
   });
@@ -1850,7 +1850,7 @@ describe('throwing daggers', () => {
     assert.equal(next.throwPending, true);
     assert.equal(next.inventory.throwingDaggers, 2);
     assert.equal(next.player.hp, 30);
-    assert.ok(next.messages.some(m => m.includes('Throw dagger') && m.includes('choose direction')));
+    assert.ok(next.messages.some(m => m.includes('Throw blade') && m.includes('choose direction')));
   });
 
   it('throwDir at a monster deals damage with melee defense+variance, decrements stack, runs monster turns', () => {

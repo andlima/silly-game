@@ -21,7 +21,7 @@ const MONSTER_TYPES = {
 const PLAYER_STATS = { hp: 30, maxHp: 30, attack: 5, defense: 2 };
 
 const EQUIPMENT_TYPES = {
-  dagger: { name: 'Dagger', slot: 'weapon', stat: 'attack', bonus: 2, char: '|', color: '#aaaaaa' },
+  dagger: { name: 'Knife', slot: 'weapon', stat: 'attack', bonus: 2, char: '|', color: '#aaaaaa' },
   sword:  { name: 'Sword',  slot: 'weapon', stat: 'attack', bonus: 4, char: '/', color: '#dddddd' },
   helmet: { name: 'Helmet', slot: 'helmet', stat: 'defense', bonus: 1, char: '^', color: '#88aacc' },
   shield: { name: 'Shield', slot: 'shield', stat: 'defense', bonus: 2, char: ']', color: '#99bbdd' },
@@ -556,7 +556,7 @@ function checkPickup(game) {
 
   if (itemHere.type === 'throwing_dagger') {
     const newCount = (game.inventory.throwingDaggers || 0) + 1;
-    const messages = [...game.messages, `You pick up a throwing dagger (${newCount} total).`];
+    const messages = [...game.messages, `You pick up a throwing blade (${newCount} total).`];
     return {
       ...game,
       items: items.filter(it => it !== itemHere),
@@ -969,7 +969,7 @@ function handleCastCancel(game) {
 
 function formatShopEntry(entry) {
   if (entry.kind === 'food') return `Food — ${entry.price}g`;
-  if (entry.kind === 'throwing_dagger') return `Throwing dagger — ${entry.price}g`;
+  if (entry.kind === 'throwing_dagger') return `Throwing blade — ${entry.price}g`;
   if (entry.kind === 'equipment') {
     const eq = EQUIPMENT_TYPES[entry.subtype];
     const statLabel = eq.stat === 'attack' ? 'atk' : 'def';
@@ -1041,7 +1041,7 @@ function handleShopBuy(game, slot) {
         gold: game.inventory.gold - entry.price,
         throwingDaggers: tdCount + 1,
       },
-    }, `You buy a throwing dagger for ${entry.price}g.`);
+    }, `You buy a throwing blade for ${entry.price}g.`);
   }
 
   if (entry.kind === 'equipment') {
@@ -1100,10 +1100,10 @@ function handleShopClose(game) {
 function handleThrow(game) {
   const count = game.inventory.throwingDaggers || 0;
   if (count <= 0) {
-    const messages = [...game.messages, 'You have no throwing daggers.'];
+    const messages = [...game.messages, 'You have no throwing blades.'];
     return { ...game, messages: messages.slice(-MAX_MESSAGES) };
   }
-  const messages = [...game.messages, 'Throw dagger \u2014 choose direction (\u2190\u2191\u2193\u2192).'];
+  const messages = [...game.messages, 'Throw blade \u2014 choose direction (\u2190\u2191\u2193\u2192).'];
   return { ...game, throwPending: true, messages: messages.slice(-MAX_MESSAGES) };
 }
 
@@ -1147,7 +1147,7 @@ function handleThrowDir(game, dir) {
     const base = DAGGER_THROW_DAMAGE - hitMonster.defense;
     const damage = Math.max(0, base + rollVariance());
     const newHp = hitMonster.hp - damage;
-    messages.push(`Your throwing dagger hits the ${hitMonster.name} for ${damage} damage.`);
+    messages.push(`Your throwing blade hits the ${hitMonster.name} for ${damage} damage.`);
     stats = { ...stats, damageDealt: stats.damageDealt + damage };
     if (newHp <= 0) {
       messages.push(`The ${hitMonster.name} is defeated!`);
@@ -1167,7 +1167,7 @@ function handleThrowDir(game, dir) {
     }
   } else if (blockedByWall) {
     items = [...items, { x: lastWalkX, y: lastWalkY, type: 'throwing_dagger', char: '-', color: '#cccc99' }];
-    messages.push('Your throwing dagger clatters to the floor.');
+    messages.push('Your throwing blade clatters to the floor.');
   }
 
   const updated = {
