@@ -166,6 +166,15 @@
       touch-action: manipulation;
     }
     #action-bar button:active { background: #444; }
+    #action-bar button.active {
+      background: #884400;
+      color: #ffcc66;
+      border-color: #cc8833;
+    }
+    #action-bar button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
 
     /* Help overlay */
     #help-overlay {
@@ -301,13 +310,15 @@
       <div class="help-row"><span class="help-key">R</span><span class="help-desc">Restart game</span></div>
       <h3>Touch Controls</h3>
       <div class="help-row"><span class="help-key">Tap quadrant</span><span class="help-desc">Move</span></div>
-      <div class="help-row"><span class="help-key">Action buttons</span><span class="help-desc">Food / Use / Wait</span></div>
+      <div class="help-row"><span class="help-key">Action buttons</span><span class="help-desc">Food / Cast / Throw / Use / Wait</span></div>
       <div class="help-dismiss">Press ? or Esc to close</div>
       <div class="help-version" id="help-version"></div>
     </div>
   </div>
   <div id="action-bar">
     <button id="btn-food">Food</button>
+    <button id="btn-cast">Cast</button>
+    <button id="btn-throw">Throw</button>
     <button id="btn-descend">Use</button>
     <button id="btn-wait">Wait</button>
   </div>
@@ -844,6 +855,8 @@
         daggersEl.innerHTML = '<span style="opacity:0.3">\u{1F52A}\u2014</span>';
       }
 
+      syncActionButtons(daggerCount);
+
       const modeLabels = { sprite: '[sprite]', emoji: '[emoji]', ascii: '[ASCII]' };
       modeEl.textContent = modeLabels[renderMode];
 
@@ -892,6 +905,34 @@
         overlayEl.classList.add('visible');
       } else {
         overlayEl.classList.remove('visible');
+      }
+    }
+
+    function syncActionButtons(daggerCount) {
+      const castBtn = document.getElementById('btn-cast');
+      const throwBtn = document.getElementById('btn-throw');
+      const ended = game.gameOver || game.won;
+
+      const hasSpell = !!(game.spell && game.spell.charges > 0);
+      if (game.castPending) {
+        castBtn.textContent = 'Cancel';
+        castBtn.classList.add('active');
+        castBtn.disabled = false;
+      } else {
+        castBtn.textContent = 'Cast';
+        castBtn.classList.remove('active');
+        castBtn.disabled = !hasSpell || ended;
+      }
+
+      const hasDaggers = daggerCount > 0;
+      if (game.throwPending) {
+        throwBtn.textContent = 'Cancel';
+        throwBtn.classList.add('active');
+        throwBtn.disabled = false;
+      } else {
+        throwBtn.textContent = 'Throw';
+        throwBtn.classList.remove('active');
+        throwBtn.disabled = !hasDaggers || ended;
       }
     }
 
@@ -1237,6 +1278,7 @@
       touchHoldDelayTimer = setTimeout(() => {
         touchHoldDelayTimer = null;
         if (game.gameOver || game.won) return;
+        if (game.castPending || game.throwPending) return;
         touchHoldActive = true;
         const dir = computeTouchDir(touchStartX, touchStartY);
         const oldGame = game;
@@ -1244,6 +1286,7 @@
         if (shouldStopRepeating(oldGame, game, dir)) { stopTouchHoldRepeat(); return; }
         touchHoldRepeatTimer = setInterval(() => {
           if (game.gameOver || game.won) { stopTouchHoldRepeat(); return; }
+          if (game.castPending || game.throwPending) { stopTouchHoldRepeat(); return; }
           const oldG = game;
           dispatchAndPlay({ type: 'move', dir });
           if (shouldStopRepeating(oldG, game, dir)) stopTouchHoldRepeat();
@@ -1265,7 +1308,13 @@
       // Only process taps (not drags/scrolls)
       if (Math.abs(moveX) > 15 || Math.abs(moveY) > 15) return;
       const dir = computeTouchDir(touch.clientX, touch.clientY);
-      dispatchAndPlay({ type: 'move', dir });
+      if (game.castPending) {
+        dispatchAndPlay({ type: 'castDir', dir });
+      } else if (game.throwPending) {
+        dispatchAndPlay({ type: 'throwDir', dir });
+      } else {
+        dispatchAndPlay({ type: 'move', dir });
+      }
     }, { passive: false });
 
     canvas.addEventListener('touchcancel', (e) => {
@@ -1291,6 +1340,24 @@
       initAudio(); audioReady = true;
       if (game.gameOver || game.won) return;
       dispatchAndPlay({ type: 'wait' });
+    });
+    document.getElementById('btn-cast').addEventListener('click', () => {
+      initAudio(); audioReady = true;
+      if (game.gameOver || game.won) return;
+      if (game.castPending) {
+        dispatchAndPlay({ type: 'castCancel' });
+      } else {
+        dispatchAndPlay({ type: 'cast' });
+      }
+    });
+    document.getElementById('btn-throw').addEventListener('click', () => {
+      initAudio(); audioReady = true;
+      if (game.gameOver || game.won) return;
+      if (game.throwPending) {
+        dispatchAndPlay({ type: 'throwCancel' });
+      } else {
+        dispatchAndPlay({ type: 'throw' });
+      }
     });
 
     restartBtn.addEventListener('click', () => {
