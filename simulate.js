@@ -61,7 +61,7 @@ function aggregateStats(results) {
   // Equipment frequency
   const equipCounts = { dagger: 0, sword: 0, helmet: 0, shield: 0 };
   for (const r of results) {
-    if (r.equipment.weapon === 'Dagger') equipCounts.dagger++;
+    if (r.equipment.weapon === 'Knife') equipCounts.dagger++;
     if (r.equipment.weapon === 'Sword') equipCounts.sword++;
     if (r.equipment.helmet === 'Helmet') equipCounts.helmet++;
     if (r.equipment.shield === 'Shield') equipCounts.shield++;
@@ -163,7 +163,7 @@ function printReport(agg) {
   console.log(`  Avg idol offerings:  ${agg.economy.avgIdolOfferings}`);
 
   console.log('\nEquipment (% of games where found)');
-  console.log(`  Dagger:  ${pct(agg.equipment.dagger).padStart(4)}`);
+  console.log(`  Knife:   ${pct(agg.equipment.dagger).padStart(4)}`);
   console.log(`  Sword:   ${pct(agg.equipment.sword).padStart(4)}`);
   console.log(`  Helmet:  ${pct(agg.equipment.helmet).padStart(4)}`);
   console.log(`  Shield:  ${pct(agg.equipment.shield).padStart(4)}`);

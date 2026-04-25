@@ -291,7 +291,7 @@ function render() {
   out += `  ${FG_CYAN}Level: ${game.level}${RESET}`;
   out += `  ${FG_MAGENTA}Food: ${game.inventory.food}${RESET}`;
   out += `  ${FG_YELLOW}Gold: ${game.inventory.gold}${RESET}`;
-  out += `  ${FG_WHITE}Daggers: ${daggerLabel}${RESET}`;
+  out += `  ${FG_WHITE}Blades: ${daggerLabel}${RESET}`;
   out += `  ${FG_GREY}${modeLabel}${RESET}`;
   out += `  |  ${FG_GREY}p:food  f:cast  t:throw  >/.:use  Tab:toggle  q:quit${RESET}\n`;
 
@@ -325,7 +325,7 @@ function renderHelp() {
   out += `  ${FG_WHITE}Actions${RESET}\n`;
   out += `    ${FG_CYAN}P${RESET}                  ${FG_GREY}Use food${RESET}\n`;
   out += `    ${FG_CYAN}F${RESET}                  ${FG_GREY}Cast spell${RESET}\n`;
-  out += `    ${FG_CYAN}T${RESET}                  ${FG_GREY}Throw dagger${RESET}\n`;
+  out += `    ${FG_CYAN}T${RESET}                  ${FG_GREY}Throw blade${RESET}\n`;
   out += `    ${FG_CYAN}. or >${RESET}              ${FG_GREY}Interact / descend${RESET}\n`;
   out += `    ${FG_CYAN}5${RESET}                  ${FG_GREY}Wait a turn${RESET}\n\n`;
   out += `  ${FG_GREY}Walk onto a merchant (M) and press . to shop${RESET}\n\n`;
@@ -347,7 +347,7 @@ function renderStats(out) {
   out += `  ${FG_GREY}Gold spent: ${FG_YELLOW}${s.goldSpent || 0}${RESET}\n`;
   out += `  ${FG_GREY}Idol offerings: ${FG_WHITE}${s.idolOfferings || 0}${RESET}\n`;
   out += `  ${FG_GREY}Spells cast: ${FG_WHITE}${s.spellsCast || 0}${RESET}\n`;
-  out += `  ${FG_GREY}Daggers thrown: ${FG_WHITE}${s.daggersThrown || 0}${RESET}\n`;
+  out += `  ${FG_GREY}Blades thrown: ${FG_WHITE}${s.daggersThrown || 0}${RESET}\n`;
   out += `  ${FG_GREY}Steps taken: ${FG_WHITE}${s.stepsTaken || 0}${RESET}\n`;
   return out;
 }
