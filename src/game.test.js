@@ -1204,6 +1204,106 @@ describe('rescue the princess', () => {
   });
 });
 
+describe('final boss dragon', () => {
+  it('level 5 newLevel produces exactly one dragon, in the last room', () => {
+    for (let trial = 0; trial < 5; trial++) {
+      let g = createGame();
+      while (g.level < 5) {
+        g.map.tiles[g.player.y][g.player.x] = '>';
+        g = dispatch(g, { type: 'descend' });
+      }
+      const dragons = g.monsters.filter(m => m.type === 'dragon');
+      assert.equal(dragons.length, 1, 'Exactly one dragon should spawn on level 5');
+      const dragon = dragons[0];
+      const lastRoom = g.map.rooms[g.map.rooms.length - 1];
+      const inLastRoom = dragon.x >= lastRoom.x && dragon.x < lastRoom.x + lastRoom.w &&
+                         dragon.y >= lastRoom.y && dragon.y < lastRoom.y + lastRoom.h;
+      assert.ok(inLastRoom, `Dragon at (${dragon.x},${dragon.y}) must be in last room`);
+      const princess = g.items.find(it => it.type === 'princess');
+      const dist = Math.abs(dragon.x - princess.x) + Math.abs(dragon.y - princess.y);
+      assert.ok(dist >= 1, 'Dragon should not occupy the princess tile');
+    }
+  });
+
+  it('boss dragon has boss-tier stats (hp 60, attack 12, defense 5, awareness 8)', () => {
+    let g = createGame();
+    while (g.level < 5) {
+      g.map.tiles[g.player.y][g.player.x] = '>';
+      g = dispatch(g, { type: 'descend' });
+    }
+    const dragon = g.monsters.find(m => m.type === 'dragon');
+    assert.ok(dragon);
+    assert.equal(dragon.hp, 60);
+    assert.equal(dragon.maxHp, 60);
+    assert.equal(dragon.attack, 12);
+    assert.equal(dragon.defense, 5);
+    assert.equal(dragon.awareness, 8);
+  });
+
+  it('dragons never spawn randomly on levels 1-4', () => {
+    for (let trial = 0; trial < 20; trial++) {
+      let g = createGame();
+      for (let lvl = 1; lvl <= 4; lvl++) {
+        assert.equal(g.monsters.filter(m => m.type === 'dragon').length, 0,
+          `Level ${lvl} should have no dragons`);
+        g.map.tiles[g.player.y][g.player.x] = '>';
+        g = dispatch(g, { type: 'descend' });
+      }
+    }
+  });
+
+  it('trolls appear in random spawns at level >= 4', () => {
+    let foundTroll = false;
+    for (let trial = 0; trial < 80 && !foundTroll; trial++) {
+      let g = createGame();
+      while (g.level < 4) {
+        g.map.tiles[g.player.y][g.player.x] = '>';
+        g = dispatch(g, { type: 'descend' });
+      }
+      if (g.monsters.some(m => m.type === 'troll')) foundTroll = true;
+    }
+    assert.ok(foundTroll, 'Trolls should appear within sample at level 4');
+  });
+
+  it('trolls do not appear in random spawns at levels 1-3', () => {
+    for (let trial = 0; trial < 20; trial++) {
+      let g = createGame();
+      for (let lvl = 1; lvl <= 3; lvl++) {
+        assert.equal(g.monsters.filter(m => m.type === 'troll').length, 0,
+          `Level ${lvl} should have no trolls`);
+        g.map.tiles[g.player.y][g.player.x] = '>';
+        g = dispatch(g, { type: 'descend' });
+      }
+    }
+  });
+
+  it('interacting on princess while dragon alive: no win, gating message, no monster turn', () => {
+    const princess = { x: 2, y: 2, type: 'princess', char: 'P', color: '#ff88cc' };
+    const dragon = {
+      x: 5, y: 5, type: 'dragon', name: 'Dragon', char: 'd', color: '#cc00cc',
+      hp: 60, maxHp: 60, attack: 12, defense: 5, awareness: 8,
+    };
+    const game = makeGame({ items: [princess], monsters: [dragon], level: 5 });
+    const next = dispatch(game, { type: 'interact' });
+    assert.equal(next.won, false);
+    assert.ok(next.messages.some(m => m.includes('roars')));
+    // Dragon position unchanged → monster turn did not run
+    const d = next.monsters.find(m => m.type === 'dragon');
+    assert.equal(d.x, 5);
+    assert.equal(d.y, 5);
+    assert.equal(d.hp, 60);
+  });
+
+  it('interacting on princess after dragon is dead sets won and adds victory message', () => {
+    const princess = { x: 2, y: 2, type: 'princess', char: 'P', color: '#ff88cc' };
+    const game = makeGame({ items: [princess], monsters: [], level: 5 });
+    const next = dispatch(game, { type: 'interact' });
+    assert.equal(next.won, true);
+    assert.ok(next.messages.some(m => m.includes('slay the dragon')));
+    assert.ok(next.messages.some(m => m.includes('rescue the princess')));
+  });
+});
+
 describe('SPELL_TYPES has mechanic field', () => {
   it('all four spell types exist with mechanic field', () => {
     assert.ok(SPELL_TYPES.firebolt);
