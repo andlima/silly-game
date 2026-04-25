@@ -11,10 +11,11 @@ const DIRECTIONS = {
 };
 
 const MONSTER_TYPES = {
-  rat:      { name: 'Rat',      char: 'r', color: '#cc6633', hp: 5,  attack: 2, defense: 0, awareness: 3, minGold: 0, maxGold: 1 },
-  skeleton: { name: 'Skeleton', char: 's', color: '#cccccc', hp: 10, attack: 4, defense: 1, awareness: 4, minGold: 2, maxGold: 4 },
-  bear:     { name: 'Bear',     char: 'b', color: '#996633', hp: 20, attack: 6, defense: 3, awareness: 5, minGold: 4, maxGold: 8 },
-  dragon:   { name: 'Dragon',   char: 'd', color: '#cc00cc', hp: 30, attack: 8, defense: 4, awareness: 6, minGold: 8, maxGold: 16 },
+  rat:      { name: 'Rat',      char: 'r', color: '#cc6633', hp: 5,  attack: 2,  defense: 0, awareness: 3, minGold: 0,  maxGold: 1 },
+  skeleton: { name: 'Skeleton', char: 's', color: '#cccccc', hp: 10, attack: 4,  defense: 1, awareness: 4, minGold: 2,  maxGold: 4 },
+  bear:     { name: 'Bear',     char: 'b', color: '#996633', hp: 20, attack: 6,  defense: 3, awareness: 5, minGold: 4,  maxGold: 8 },
+  troll:    { name: 'Troll',    char: 't', color: '#669944', hp: 25, attack: 7,  defense: 3, awareness: 5, minGold: 6,  maxGold: 12 },
+  dragon:   { name: 'Dragon',   char: 'd', color: '#cc00cc', hp: 60, attack: 12, defense: 5, awareness: 8, minGold: 16, maxGold: 32 },
 };
 
 const PLAYER_STATS = { hp: 30, maxHp: 30, attack: 5, defense: 2 };
@@ -122,6 +123,7 @@ function newLevel(state) {
     placeStair(map);
   } else {
     placePrincess(map, items);
+    placeBoss(map, monsters);
   }
 
   // Initialize revealed array (all false) and compute initial FOV
@@ -173,6 +175,50 @@ function placePrincess(map, items) {
   const cx = Math.floor(room.x + room.w / 2);
   const cy = Math.floor(room.y + room.h / 2);
   items.push({ x: cx, y: cy, type: 'princess', char: 'P', color: '#ff88cc' });
+}
+
+function placeBoss(map, monsters) {
+  const room = map.rooms[map.rooms.length - 1];
+  const cx = Math.floor(room.x + room.w / 2);
+  const cy = Math.floor(room.y + room.h / 2);
+  const template = MONSTER_TYPES.dragon;
+  const makeBoss = (x, y) => ({
+    x, y, type: 'dragon', name: template.name, char: template.char,
+    color: template.color, hp: template.hp, maxHp: template.hp,
+    attack: template.attack, defense: template.defense, awareness: template.awareness,
+  });
+
+  // Try cardinal neighbours of (cx, cy) in fixed order: N, E, S, W.
+  const neighbours = [
+    { x: cx,     y: cy - 1 }, // N
+    { x: cx + 1, y: cy     }, // E
+    { x: cx,     y: cy + 1 }, // S
+    { x: cx - 1, y: cy     }, // W
+  ];
+  for (const pos of neighbours) {
+    if (
+      isWalkable(map, pos.x, pos.y) &&
+      !monsters.some(m => m.x === pos.x && m.y === pos.y)
+    ) {
+      monsters.push(makeBoss(pos.x, pos.y));
+      return;
+    }
+  }
+
+  // Fallback: any walkable tile in the last room not occupied by a monster
+  // and not on the princess centre.
+  for (let y = room.y; y < room.y + room.h; y++) {
+    for (let x = room.x; x < room.x + room.w; x++) {
+      if (x === cx && y === cy) continue;
+      if (
+        isWalkable(map, x, y) &&
+        !monsters.some(m => m.x === x && m.y === y)
+      ) {
+        monsters.push(makeBoss(x, y));
+        return;
+      }
+    }
+  }
 }
 
 function spawnFood(map, monsters) {
@@ -358,6 +404,7 @@ function spawnMonsters(map, level) {
   const monsters = [];
   const baseCount = 1 + Math.floor(level / 2);
   for (let i = 1; i < map.rooms.length; i++) {
+    if (level === WIN_LEVEL && i === map.rooms.length - 1) continue;
     const room = map.rooms[i];
     const count = baseCount + Math.floor(Math.random() * 2); // baseCount to baseCount+1
     for (let j = 0; j < count; j++) {
@@ -382,7 +429,7 @@ function spawnMonsters(map, level) {
 
 function pickMonsterType(level) {
   const roll = Math.random();
-  if (level >= 4 && roll < 0.15) return 'dragon';
+  if (level >= 4 && roll < 0.15) return 'troll';
   if (level >= 3 && roll < 0.35) return 'bear';
   return Math.random() < 0.5 ? 'rat' : 'skeleton';
 }
@@ -591,7 +638,15 @@ function handleInteract(game) {
   const princessHere = items.find(it => it.x === player.x && it.y === player.y && it.type === 'princess');
 
   if (princessHere) {
-    const messages = [...game.messages, 'You rescue the princess! The kingdom celebrates.'];
+    const dragonAlive = game.monsters.some(m => m.type === 'dragon');
+    if (dragonAlive) {
+      const messages = [...game.messages, 'The dragon roars — you cannot rescue her yet!'];
+      return {
+        ...game,
+        messages: messages.slice(-MAX_MESSAGES),
+      };
+    }
+    const messages = [...game.messages, 'You slay the dragon and rescue the princess! The kingdom celebrates.'];
     return {
       ...game,
       messages: messages.slice(-MAX_MESSAGES),

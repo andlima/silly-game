@@ -10,6 +10,7 @@ export const GLYPHS_ENHANCED = {
   rat:      { char: '\ud83d\udc00', wide: true },    // 🐀
   skeleton: { char: '\ud83d\udc80', wide: true },    // 💀
   bear:     { char: '\ud83d\udc3b', wide: true },    // 🐻
+  troll:    { char: '\ud83e\uddcc', wide: true },
   dragon:   { char: '\ud83d\udc09', wide: true },    // 🐉
   food:     { char: '\ud83c\udf4e', wide: true },    // 🍎
   dagger:   { char: '\ud83d\udde1\ufe0f', wide: true },  // 🗡️
@@ -37,6 +38,7 @@ export const GLYPHS_ASCII = {
   rat:      { char: 'r', wide: false },
   skeleton: { char: 's', wide: false },
   bear:     { char: 'b', wide: false },
+  troll:    { char: 't', wide: false },
   dragon:   { char: 'd', wide: false },
   food:     { char: '%', wide: false },
   dagger:   { char: '|', wide: false },
