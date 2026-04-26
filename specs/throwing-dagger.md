@@ -130,9 +130,9 @@ Modeled closely on the spell-cast flow:
 
 14. Add `throwing_blade` to `GLYPHS_ENHANCED` — suggest the kitchen-knife
     emoji (`🔪`, wide). Must be visibly distinct from the melee
-    `dagger` glyph so players can tell the two items apart on the floor.
+    `knife` glyph so players can tell the two items apart on the floor.
 15. Add `throwing_blade` to `GLYPHS_ASCII` — suggest `-` (not wide), to
-    contrast with `|` (the melee dagger glyph).
+    contrast with `|` (the melee knife glyph).
 
 ### Browser frontend (`index.html`)
 
@@ -145,7 +145,7 @@ Modeled closely on the spell-cast flow:
 18. While `throwPending`, the message area shows the direction prompt
     (parallel to the cast prompt).
 19. Thrown-blade items on the map render with the throwing-blade glyph and
-    a distinct colour from the melee dagger.
+    a distinct colour from the melee knife.
 20. On throw resolution, call `playAttack()` (existing audio helper).
 21. Game-over overlay includes `bladesThrown` in the stats list.
 
@@ -202,7 +202,7 @@ Modeled closely on the spell-cast flow:
   scarce; (b) misses are partially recoverable, giving throws a different
   risk/reward curve; (c) they cost from a counted stack, not scroll charges.
 - Base damage of 4 sits between a bare fist (`player.attack = 5`) and a
-  Firebolt (8). A dagger-equipped player hitting melee will usually out-DPS a
+  Firebolt (8). A knife-equipped player hitting melee will usually out-DPS a
   thrown blade; throws are for kiting rats/skeletons at range or softening
   a bear before melee. Tune if playtests show this is too strong against
   dragons.
@@ -210,10 +210,10 @@ Modeled closely on the spell-cast flow:
   Firebolt in early levels — scroll charges vanish on fizzle, throws you can
   mostly walk over and pick back up. This makes throws the entry-level
   ranged option while scrolls remain the burst option.
-- Modeling throwing blades separately from the melee `dagger` equipment
+- Modeling throwing blades separately from the melee `knife` equipment
   avoids the "do I throw my only weapon?" ambiguity and keeps the equipment
   system untouched. Two distinct glyphs (the kitchen-knife glyph for the
-  throwing blade vs the dagger glyph for the melee dagger) signal this
+  throwing blade vs the knife glyph for the melee knife) signal this
   clearly.
 
 ## Agent Notes
