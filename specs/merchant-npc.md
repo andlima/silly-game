@@ -4,7 +4,7 @@ status: not-started
 area: full-stack
 priority: 50
 depends_on: []
-description: Add a shopkeeper NPC that occasionally appears on a dungeon level and sells items (food, daggers, equipment, scrolls) for gold
+description: Add a shopkeeper NPC that occasionally appears on a dungeon level and sells items (food, knives, equipment, scrolls) for gold
 ---
 
 # Merchant NPC
@@ -56,7 +56,7 @@ Price table (gold):
 |-------------------|-------|
 | food              | 3     |
 | throwing_blade    | 2     |
-| dagger            | 5     |
+| knife             | 5     |
 | helmet            | 5     |
 | sword             | 12    |
 | shield            | 8     |
@@ -76,7 +76,7 @@ idol.
      ```
      Merchant: "What'll it be?"
        1) Food — 3g
-       2) Throwing blade — 2g      (or "Dagger (+2 atk) — 5g", etc.)
+       2) Throwing blade — 2g      (or "Knife (+2 atk) — 5g", etc.)
        3) Firebolt scroll — 8g
      (press number to buy, any other key to leave)
      ```

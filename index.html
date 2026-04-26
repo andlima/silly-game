@@ -445,7 +445,7 @@
       bear:     { col: 1, row: 1 },
       dragon:   { col: 2, row: 1 },
       stair:    { col: 3, row: 1 },
-      dagger:   { col: 0, row: 2 },
+      knife:    { col: 0, row: 2 },
       sword:    { col: 1, row: 2 },
       helmet:   { col: 2, row: 2 },
       shield:   { col: 3, row: 2 },
@@ -470,7 +470,7 @@
       player:  '#ffcc00',
       stair:   '#5599dd',
       food:    '#dd55cc',
-      dagger:  '#aaaaaa',
+      knife:   '#aaaaaa',
       sword:   '#dddddd',
       helmet:  '#88aacc',
       shield:  '#99bbdd',
@@ -816,7 +816,7 @@
       const equipParts = [];
       // weapon
       if (eq.weapon) {
-        const wEmoji = eq.weapon.name === 'Dagger' ? '\u{1F52A}' : '\u2694\uFE0F';
+        const wEmoji = eq.weapon.name === 'Knife' ? '\u{1F52A}' : '\u2694\uFE0F';
         equipParts.push(`${wEmoji}+${eq.weapon.bonus}`);
       } else {
         equipParts.push('<span style="opacity:0.3">\u2694\uFE0F</span>');

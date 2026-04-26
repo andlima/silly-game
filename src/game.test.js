@@ -363,20 +363,20 @@ describe('equipment', () => {
   afterEach(() => setRollOverride(null));
 
   it('picking up equipment into an empty slot equips it', () => {
-    const dagger = { x: 3, y: 2, type: 'dagger', char: '|', color: '#aaaaaa' };
-    const game = makeGame({ items: [dagger], equipment: { weapon: null, helmet: null, shield: null } });
+    const knife = { x: 3, y: 2, type: 'knife', char: '|', color: '#aaaaaa' };
+    const game = makeGame({ items: [knife], equipment: { weapon: null, helmet: null, shield: null } });
     const next = dispatch(game, { type: 'move', dir: 'e' });
     assert.equal(next.items.length, 0);
-    assert.equal(next.equipment.weapon.type, 'dagger');
+    assert.equal(next.equipment.weapon.type, 'knife');
     assert.equal(next.equipment.weapon.bonus, 2);
-    assert.ok(next.messages.some(m => m.includes('equip a Dagger')));
+    assert.ok(next.messages.some(m => m.includes('equip a Knife')));
   });
 
   it('picking up a strictly better item replaces equipped item', () => {
     const sword = { x: 3, y: 2, type: 'sword', char: '/', color: '#dddddd' };
     const game = makeGame({
       items: [sword],
-      equipment: { weapon: { type: 'dagger', name: 'Dagger', bonus: 2, stat: 'attack' }, helmet: null, shield: null },
+      equipment: { weapon: { type: 'knife', name: 'Knife', bonus: 2, stat: 'attack' }, helmet: null, shield: null },
     });
     const next = dispatch(game, { type: 'move', dir: 'e' });
     assert.equal(next.items.length, 0);
@@ -386,9 +386,9 @@ describe('equipment', () => {
   });
 
   it('picking up an equal or worse item is skipped', () => {
-    const dagger = { x: 3, y: 2, type: 'dagger', char: '|', color: '#aaaaaa' };
+    const knife = { x: 3, y: 2, type: 'knife', char: '|', color: '#aaaaaa' };
     const game = makeGame({
-      items: [dagger],
+      items: [knife],
       equipment: { weapon: { type: 'sword', name: 'Sword', bonus: 4, stat: 'attack' }, helmet: null, shield: null },
     });
     const next = dispatch(game, { type: 'move', dir: 'e' });
@@ -532,7 +532,7 @@ describe('createGame structure', () => {
   it('spawns food and equipment on the map', () => {
     const game = createGame();
     const food = game.items.filter(it => it.type === 'food');
-    const equipment = game.items.filter(it => ['dagger', 'sword', 'helmet', 'shield'].includes(it.type));
+    const equipment = game.items.filter(it => ['knife', 'sword', 'helmet', 'shield'].includes(it.type));
     assert.ok(food.length >= 1 && food.length <= 2,
       `Expected 1-2 food, got ${food.length}`);
     assert.ok(equipment.length >= 1 && equipment.length <= 2,
@@ -1568,7 +1568,7 @@ describe('merchant shop', () => {
   function makeMerchantStock() {
     return [
       { kind: 'food', price: 3 },
-      { kind: 'equipment', subtype: 'dagger', price: 5 },
+      { kind: 'equipment', subtype: 'knife', price: 5 },
       { kind: 'scroll', subtype: 'firebolt', price: 8 },
     ];
   }
@@ -1681,7 +1681,7 @@ describe('merchant shop', () => {
     const game = makeGame({
       items: [merchant],
       inventory: { gold: 20 },
-      equipment: { weapon: { type: 'dagger', name: 'Dagger', bonus: 2, stat: 'attack' }, helmet: null, shield: null },
+      equipment: { weapon: { type: 'knife', name: 'Knife', bonus: 2, stat: 'attack' }, helmet: null, shield: null },
       shopPending: true,
       shopItems: stock,
     });

@@ -21,7 +21,7 @@ const MONSTER_TYPES = {
 const PLAYER_STATS = { hp: 30, maxHp: 30, attack: 5, defense: 2 };
 
 const EQUIPMENT_TYPES = {
-  dagger: { name: 'Dagger', slot: 'weapon', stat: 'attack', bonus: 2, char: '|', color: '#aaaaaa' },
+  knife:  { name: 'Knife',  slot: 'weapon', stat: 'attack', bonus: 2, char: '|', color: '#aaaaaa' },
   sword:  { name: 'Sword',  slot: 'weapon', stat: 'attack', bonus: 4, char: '/', color: '#dddddd' },
   helmet: { name: 'Helmet', slot: 'helmet', stat: 'defense', bonus: 1, char: '^', color: '#88aacc' },
   shield: { name: 'Shield', slot: 'shield', stat: 'defense', bonus: 2, char: ']', color: '#99bbdd' },
@@ -69,7 +69,7 @@ const DEFAULT_STATS = {
 const MERCHANT_PRICES = {
   food: 3,
   throwing_blade: 2,
-  dagger: 5,
+  knife: 5,
   helmet: 5,
   sword: 12,
   shield: 8,
@@ -366,12 +366,12 @@ function spawnThrowingBlades(map, monsters, items, level) {
 }
 
 function pickEquipmentType(level) {
-  // Levels 1-2: daggers and helmets; levels 3+: add swords and shields
+  // Levels 1-2: knives and helmets; levels 3+: add swords and shields
   if (level <= 2) {
-    return Math.random() < 0.5 ? 'dagger' : 'helmet';
+    return Math.random() < 0.5 ? 'knife' : 'helmet';
   }
   const roll = Math.random();
-  if (roll < 0.25) return 'dagger';
+  if (roll < 0.25) return 'knife';
   if (roll < 0.50) return 'helmet';
   if (roll < 0.75) return 'sword';
   return 'shield';

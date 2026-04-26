@@ -148,7 +148,7 @@ const MONSTER_COLORS = {
 };
 
 const EQUIPMENT_COLORS = {
-  dagger: FG_WHITE,
+  knife: FG_WHITE,
   throwing_blade: fg256(180),
   sword:  FG_WHITE,
   helmet: FG_CYAN,
