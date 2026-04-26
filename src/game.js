@@ -58,17 +58,17 @@ const MAX_MESSAGES = 20;
 const WIN_LEVEL = 5;
 const FOOD_HEAL = 10;
 const IDOL_MAXHP_BONUS = 5;
-export const DAGGER_THROW_DAMAGE = 4;
+export const BLADE_THROW_DAMAGE = 4;
 
 const DEFAULT_STATS = {
   monstersKilled: 0, damageDealt: 0, damageTaken: 0,
   foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-  idolOfferings: 0, spellsCast: 0, goldSpent: 0, daggersThrown: 0,
+  idolOfferings: 0, spellsCast: 0, goldSpent: 0, bladesThrown: 0,
 };
 
 const MERCHANT_PRICES = {
   food: 3,
-  throwing_dagger: 2,
+  throwing_blade: 2,
   dagger: 5,
   helmet: 5,
   sword: 12,
@@ -83,7 +83,7 @@ function getStats(game) {
 export function createGame() {
   return newLevel({
     player: { ...PLAYER_STATS },
-    inventory: { food: 0, gold: 0, throwingDaggers: 0 },
+    inventory: { food: 0, gold: 0, throwingBlades: 0 },
     equipment: { weapon: null, helmet: null, shield: null },
     spell: null,
     castPending: false,
@@ -103,7 +103,7 @@ export function createGame() {
       idolOfferings: 0,
       spellsCast: 0,
       goldSpent: 0,
-      daggersThrown: 0,
+      bladesThrown: 0,
     },
   });
 }
@@ -118,7 +118,7 @@ function newLevel(state) {
   spawnIdol(map, monsters, items, state.level);
   spawnScrolls(map, monsters, items, state.level);
   spawnMerchant(map, monsters, items, state.level);
-  spawnThrowingDaggers(map, monsters, items, state.level);
+  spawnThrowingBlades(map, monsters, items, state.level);
   if (state.level < WIN_LEVEL) {
     placeStair(map);
   } else {
@@ -157,7 +157,7 @@ function newLevel(state) {
     stats: state.stats ? { ...state.stats } : {
       monstersKilled: 0, damageDealt: 0, damageTaken: 0,
       foodUsed: 0, stepsTaken: 0, causeOfDeath: null, goldCollected: 0,
-      idolOfferings: 0, spellsCast: 0, goldSpent: 0, daggersThrown: 0,
+      idolOfferings: 0, spellsCast: 0, goldSpent: 0, bladesThrown: 0,
     },
   };
 }
@@ -288,7 +288,7 @@ function generateMerchantStock(level) {
   const stock = [];
   // Slot 1: food
   stock.push({ kind: 'food', price: MERCHANT_PRICES.food });
-  // Slot 2: throwing_dagger OR equipment (50/50). Throwing daggers not yet
+  // Slot 2: throwing_blade OR equipment (50/50). Throwing blades not yet
   // implemented, so always substitute equipment.
   const eqType = pickEquipmentType(level);
   stock.push({ kind: 'equipment', subtype: eqType, price: MERCHANT_PRICES[eqType] });
@@ -343,7 +343,7 @@ function spawnScrolls(map, monsters, items, level) {
   }
 }
 
-function spawnThrowingDaggers(map, monsters, items, level) {
+function spawnThrowingBlades(map, monsters, items, level) {
   if (level < 1) return;
   const count = Math.floor(Math.random() * 3); // 0-2 per level
   for (let i = 0; i < count; i++) {
@@ -358,7 +358,7 @@ function spawnThrowingDaggers(map, monsters, items, level) {
         !items.some(it => it.x === x && it.y === y) &&
         map.tiles[y][x] !== '>'
       ) {
-        items.push({ x, y, type: 'throwing_dagger', char: '-', color: '#cccc99' });
+        items.push({ x, y, type: 'throwing_blade', char: '-', color: '#cccc99' });
         break;
       }
     }
@@ -554,13 +554,13 @@ function checkPickup(game) {
     };
   }
 
-  if (itemHere.type === 'throwing_dagger') {
-    const newCount = (game.inventory.throwingDaggers || 0) + 1;
-    const messages = [...game.messages, `You pick up a throwing dagger (${newCount} total).`];
+  if (itemHere.type === 'throwing_blade') {
+    const newCount = (game.inventory.throwingBlades || 0) + 1;
+    const messages = [...game.messages, `You pick up a throwing blade (${newCount} total).`];
     return {
       ...game,
       items: items.filter(it => it !== itemHere),
-      inventory: { ...game.inventory, throwingDaggers: newCount },
+      inventory: { ...game.inventory, throwingBlades: newCount },
       messages: messages.slice(-MAX_MESSAGES),
     };
   }
@@ -969,7 +969,7 @@ function handleCastCancel(game) {
 
 function formatShopEntry(entry) {
   if (entry.kind === 'food') return `Food — ${entry.price}g`;
-  if (entry.kind === 'throwing_dagger') return `Throwing dagger — ${entry.price}g`;
+  if (entry.kind === 'throwing_blade') return `Throwing blade — ${entry.price}g`;
   if (entry.kind === 'equipment') {
     const eq = EQUIPMENT_TYPES[entry.subtype];
     const statLabel = eq.stat === 'attack' ? 'atk' : 'def';
@@ -1033,15 +1033,15 @@ function handleShopBuy(game, slot) {
     }, `You buy food for ${entry.price}g.`);
   }
 
-  if (entry.kind === 'throwing_dagger') {
-    const tdCount = game.inventory.throwingDaggers || 0;
+  if (entry.kind === 'throwing_blade') {
+    const tbCount = game.inventory.throwingBlades || 0;
     return finalizeShopBuy(game, merchant, slot, {
       inventory: {
         ...game.inventory,
         gold: game.inventory.gold - entry.price,
-        throwingDaggers: tdCount + 1,
+        throwingBlades: tbCount + 1,
       },
-    }, `You buy a throwing dagger for ${entry.price}g.`);
+    }, `You buy a throwing blade for ${entry.price}g.`);
   }
 
   if (entry.kind === 'equipment') {
@@ -1098,12 +1098,12 @@ function handleShopClose(game) {
 }
 
 function handleThrow(game) {
-  const count = game.inventory.throwingDaggers || 0;
+  const count = game.inventory.throwingBlades || 0;
   if (count <= 0) {
-    const messages = [...game.messages, 'You have no throwing daggers.'];
+    const messages = [...game.messages, 'You have no throwing blades.'];
     return { ...game, messages: messages.slice(-MAX_MESSAGES) };
   }
-  const messages = [...game.messages, 'Throw dagger \u2014 choose direction (\u2190\u2191\u2193\u2192).'];
+  const messages = [...game.messages, 'Throw blade \u2014 choose direction (\u2190\u2191\u2193\u2192).'];
   return { ...game, throwPending: true, messages: messages.slice(-MAX_MESSAGES) };
 }
 
@@ -1111,15 +1111,15 @@ function handleThrowDir(game, dir) {
   if (!game.throwPending) return game;
   const delta = DIRECTIONS[dir];
   if (!delta) return game;
-  const count = game.inventory.throwingDaggers || 0;
+  const count = game.inventory.throwingBlades || 0;
   if (count <= 0) {
     return { ...game, throwPending: false };
   }
 
   const messages = [...game.messages];
   let { player, monsters } = game;
-  let inventory = { ...game.inventory, throwingDaggers: count - 1 };
-  let stats = { ...getStats(game), daggersThrown: getStats(game).daggersThrown + 1 };
+  let inventory = { ...game.inventory, throwingBlades: count - 1 };
+  let stats = { ...getStats(game), bladesThrown: getStats(game).bladesThrown + 1 };
   let items = game.items;
 
   // Travel from player position; track last walkable tile passed through.
@@ -1144,10 +1144,10 @@ function handleThrowDir(game, dir) {
   }
 
   if (hitMonster) {
-    const base = DAGGER_THROW_DAMAGE - hitMonster.defense;
+    const base = BLADE_THROW_DAMAGE - hitMonster.defense;
     const damage = Math.max(0, base + rollVariance());
     const newHp = hitMonster.hp - damage;
-    messages.push(`Your throwing dagger hits the ${hitMonster.name} for ${damage} damage.`);
+    messages.push(`Your throwing blade hits the ${hitMonster.name} for ${damage} damage.`);
     stats = { ...stats, damageDealt: stats.damageDealt + damage };
     if (newHp <= 0) {
       messages.push(`The ${hitMonster.name} is defeated!`);
@@ -1166,8 +1166,8 @@ function handleThrowDir(game, dir) {
       monsters = monsters.map(m => m === hitMonster ? { ...m, hp: newHp } : m);
     }
   } else if (blockedByWall) {
-    items = [...items, { x: lastWalkX, y: lastWalkY, type: 'throwing_dagger', char: '-', color: '#cccc99' }];
-    messages.push('Your throwing dagger clatters to the floor.');
+    items = [...items, { x: lastWalkX, y: lastWalkY, type: 'throwing_blade', char: '-', color: '#cccc99' }];
+    messages.push('Your throwing blade clatters to the floor.');
   }
 
   const updated = {
