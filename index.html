@@ -816,7 +816,7 @@
       const equipParts = [];
       // weapon
       if (eq.weapon) {
-        const wEmoji = eq.weapon.name === 'Dagger' ? '\u{1F5E1}\uFE0F' : '\u2694\uFE0F';
+        const wEmoji = eq.weapon.name === 'Dagger' ? '\u{1F52A}' : '\u2694\uFE0F';
         equipParts.push(`${wEmoji}+${eq.weapon.bonus}`);
       } else {
         equipParts.push('<span style="opacity:0.3">\u2694\uFE0F</span>');
@@ -850,9 +850,9 @@
       const bladesEl = document.getElementById('hud-blades');
       const bladeCount = game.inventory.throwingBlades || 0;
       if (bladeCount > 0) {
-        bladesEl.innerHTML = `<span>\u{1F52A}${bladeCount}</span>`;
+        bladesEl.innerHTML = `<span>\u{1F5E1}\uFE0F${bladeCount}</span>`;
       } else {
-        bladesEl.innerHTML = '<span style="opacity:0.3">\u{1F52A}\u2014</span>';
+        bladesEl.innerHTML = '<span style="opacity:0.3">\u{1F5E1}\uFE0F\u2014</span>';
       }
 
       syncActionButtons(bladeCount);
