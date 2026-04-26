@@ -612,7 +612,22 @@
         if (cell.isPlayer) {
           drawSprite('player', px, py);
         } else if (cell.monster) {
-          drawSprite(cell.monster.type, px, py);
+          if (!drawSprite(cell.monster.type, px, py)) {
+            // Text fallback for monsters without sprites (e.g. troll)
+            const glyph = GLYPHS[cell.monster.type];
+            const cx = px + TILE_SIZE / 2;
+            const cy = py + TILE_SIZE / 2;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            if (glyph && glyph.wide) {
+              ctx.font = `${FONT_SIZE - 2}px ${EMOJI_FONT}`;
+              ctx.fillText(glyph.char, cx, cy);
+            } else {
+              ctx.font = `${FONT_SIZE}px monospace`;
+              ctx.fillStyle = scaleColor(cell.monster.color, b);
+              ctx.fillText((glyph || { char: cell.monster.char }).char, cx, cy);
+            }
+          }
           if (cell.monster.frozenTurns > 0) {
             ctx.fillStyle = 'rgba(136, 204, 255, 0.4)';
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
